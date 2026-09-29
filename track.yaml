@@ -91,6 +91,16 @@ contradictions_registered:
       - data/ops-extract/suggestion.csv
       - project/models/staging/stg_suggestions.sql
       - project/metrics/metric-definitions.yaml
+  - id: C7
+    summary: "first_response.sql counts actor IN ('agent', 'portal'); the extract calls the portal's reply 'assist', so 296 tickets drop out and today's build does not reproduce the published attainment or p50"
+    sources:
+      - project/models/marts/first_response.sql
+      - project/models/marts/sla_attainment.sql
+      - project/metrics/metric-definitions.yaml
+      - data/ops-extract/interaction.csv
+      - ../portwell-knowledge/data/figures/warehouse-export-2026-08-06.csv
+      - ../portwell-knowledge/data/figures/warehouse-export-2026-08-29.csv
+      - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
 
 members:
   - name: Gabriel Campos

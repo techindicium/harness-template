@@ -70,6 +70,23 @@ CONTRADICTION: `docs/incidents/INCIDENT-03.md` (2026-08-06) atribui a mudança d
 **C5 — POLICY-13 vs. output dos marts:**
 CONTRADICTION: `docs/policies.md` POLICY-13 exige que "toda figura em pack voltado ao cliente nomeie a definição de métrica e a versão com que foi calculada"; `project/models/marts/self_service.sql` emite `self_service_rate` sem qualquer campo de versão; `docs/policies.md` confirma: "Marts emitem números sem versão."
 
+**C7 — First response descarta o actor `assist`, e os números publicados não se reproduzem:**
+CONTRADICTION: `project/metrics/metric-definitions.yaml` define `first_response_minutes_p50` v1 como "minutes between ticket creation and the first outbound interaction"; `project/models/marts/first_response.sql:10` conta como saída apenas `actor IN ('agent', 'portal')`; `data/ops-extract/interaction.csv` tem os actors `customer` (1234), `agent` (938) e `assist` (296), e nenhum `portal`. As 296 interações `assist` são as `proposal_sent` do portal. Os 296 tickets cuja única resposta é `assist` (145 em julho, 151 em agosto) saem de `marts.first_response` e, por consequência, de `marts.sla_attainment`, que é "the figure the service review packs quote" (`sla_attainment.sql:3`).
+
+Medido em 2026-09-29 com `make build` (6 de 6 testes passam) contra os números que Reporting recebeu em `../portwell-knowledge/data/figures/`:
+
+| Export | Conta | Campo | Publicado | Build de hoje |
+| :- | :- | :- | -: | -: |
+| `warehouse-export-2026-08-06.csv` (julho) | ACCOUNT-1008 | tickets | 115 | 75 |
+| `warehouse-export-2026-08-06.csv` (julho) | ACCOUNT-1008 | attainment | 0.2696 | 0.08 |
+| `warehouse-export-2026-08-06.csv` (julho) | ACCOUNT-1008 | first_response_p50 | 70 | 103 |
+| `warehouse-export-2026-08-29.csv` (agosto) | ACCOUNT-1008 | attainment | 0.3966 | 0.0952 |
+| `warehouse-export-2026-08-29.csv` (agosto) | ACCOUNT-1008 | first_response_p50 | 38 | 101 |
+
+Nas três contas dos dois exports (ACCOUNT-1001, 1003, 1008): `self_service_rate` bate em 6 de 6; `tickets`, `attainment` e `first_response_p50` diferem em 18 de 18. Recalculado em memória com `actor IN ('agent', 'assist')`, os 18 valores publicados se reproduzem exatamente. O pack de julho da Sunder (`../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx`, B13 e B14) cita 0.2696 e 70.
+
+Não registrado em lugar nenhum: quando o actor deixou de se chamar `portal`, e se os exports foram gerados com outro filtro ou com outro extract. Consequência: a figura contratual do pack não pode ser reconstruída a partir do repositório hoje, e um rebuild do mês publicaria outro número sem nenhum teste falhar.
+
 ---
 
 ## Inconsistências no tracker
@@ -120,7 +137,7 @@ Source: `project/metrics/metric-definitions.yaml` (published_at 2026-08-20, owne
 |---------|--------|--------|---------------|----------------------|
 | `self_service_rate` | v2 | superseded | 2026-04-01 | **mart ainda implementa v2**: `is_self_served` sem filtro `human_edit_material` |
 | `self_service_rate` | v3 | current | 2026-07-01 | **mart NÃO implementa v3**: deveria excluir edições materiais e tickets reopened em 48h |
-| `first_response_minutes_p50` | v1 | current | 2026-02-01 | Alinhado — mart implementa mediana com minimum_denominator de 20 |
+| `first_response_minutes_p50` | v1 | current | 2026-02-01 | **Não alinhado** (C7): mediana e minimum_denominator de 20 estão implementados, mas "first outbound interaction" filtra `actor IN ('agent', 'portal')` e o extract chama a resposta do portal de `assist`; 296 tickets ficam fora |
 | `suggestion_acceptance_rate` | v1 | current | 2026-06-15 | **Nenhum mart correspondente encontrado** |
 
 **Data dictionary:** `docs/data-dictionary.xlsx` não foi lido (arquivo binário). Alinhamento com os modelos não verificado.
