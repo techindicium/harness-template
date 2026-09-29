@@ -44,13 +44,30 @@ context:
     - docs/pr-notes/0088-self-service-v3.md
     - docs/policies.md
     - docs/identifiers.md
+    - docs/dependencies.md
+    - docs/architecture-rules.md
+    - docs/backlog.md
+    - docs/incidents/README.md
+    - docs/data-dictionary.xlsx
+    - data/README.md
+    - project/rebuild.py
+  cross_track_sources:  # other tracks, read-only, for dependencies and published figures
+    - ../portwell-knowledge/data/figures/warehouse-export-2026-08-01.csv
+    - ../portwell-knowledge/data/figures/warehouse-export-2026-08-06.csv
+    - ../portwell-knowledge/data/figures/warehouse-export-2026-08-29.csv
+    - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
+    - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.docx
+    - ../portwell-knowledge/docs/dependencies.md
+    - ../portwell-knowledge/docs/backlog.md
+    - ../portwell-engineering/docs/dependencies.md
+    - ../portwell-engineering/docs/backlog.md
+    - ../portwell-product/docs/Policies.docx
   systems: UNKNOWN
   # docs/systems.md not found in track_repo; course-shared/tools/mock-systems.json not found
   # (separate repository not cloned). System information derived from interview and incident
   # sources only: operational support database (extract origin), shared folder (CSV handoff),
   # DuckDB warehouse (built by project/run.py), help portal (source of ops.suggestion table).
   not_read:
-    - docs/data-dictionary.xlsx  # binary format, not readable
     - course-shared/tools/mock-systems.json  # separate repository not cloned
 
 constraints:
@@ -121,6 +138,36 @@ contradictions_registered:
       - project/models/staging/stg_extract_metadata.sql
       - docs/how-we-work-today.md
       - data/ops-extract/extract-manifest.yaml
+  - id: C11
+    summary: "The track README describes a harness built inside the track repository and a make verify target, neither of which exists; harness-template forbids changing the track repository"
+    sources:
+      - README.md
+      - STUDENT-GUIDE.md
+      - ../harness-template/README.md
+  - id: C12
+    summary: "The data dictionary names columns and marts the models do not have (was_self-served, marts.response_times, marts.inventory_accuracy) and describes closed_tickets as closed tickets"
+    sources:
+      - docs/data-dictionary.xlsx
+      - docs/backlog.md
+      - project/models/
+  - id: C13
+    summary: "INCIDENT-03 cites ISSUE-13 in the Portal engineering backlog as the same consumer-list problem; ISSUE-13 there is 'No link between an escalation and its issue'"
+    sources:
+      - docs/incidents/INCIDENT-03.md
+      - ../portwell-engineering/docs/backlog.md
+      - ../portwell-engineering/data/tracker.csv
+  - id: C14
+    summary: "REQUEST-009 cites POLICY-11 to justify an August-only first-response median; POLICY-11, defined in the product track, covers resolution time over a trailing ninety days"
+    sources:
+      - data/requests/REQUEST-009.docx
+      - docs/policies.md
+      - ../portwell-product/docs/Policies.docx
+  - id: C15
+    summary: "INCIDENT-03 (written 2026-08-06) names TICKET-004424 as the June-to-July pack question; the ticket was opened 2026-08-20, reports a six-point drop on the dashboard, and is still open"
+    sources:
+      - docs/incidents/INCIDENT-03.md
+      - data/ops-extract/ticket.csv
+      - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
 
 members:
   - name: Gabriel Campos

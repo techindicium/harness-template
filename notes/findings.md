@@ -82,6 +82,21 @@ CONTRADICTION: Declan Byrne, na entrevista, diz que os testes checam "Row counts
 **C10 — `staging.extract_metadata` não registra a idade do extract:**
 CONTRADICTION: `project/models/staging/stg_extract_metadata.sql` se descreve como "When this snapshot was taken"; `docs/how-we-work-today.md` diz que `staging.extract_metadata` registra quando o warehouse foi construído; o SQL grava `strftime(now(), '%Y-%m-%dT%H:%M:%SZ')`. Medido em 2026-09-29: um build às 15:04:50 UTC gravou `2026-09-29T12:04:50Z`, que é a hora local (-03:00) com sufixo `Z`. O manifest diz `taken_at: 2026-08-28T09:14:00Z`. Dentro do warehouse, a data do extract não existe.
 
+**C11 — Onde o harness é construído (camada do curso):**
+CONTRADICTION: `README.md` do `portwell-analytics` diz "Four groups build one system here", descreve `scripts/lifecycle.py`, `state/`, `skills/`, `hooks/` e `evidence/<item>/` dentro do track, e manda rodar `make verify`; nada disso existe, e `make verify` falha com "No rule to make target 'verify'" (medido em 2026-09-29). O `STUDENT-GUIDE.md` do track diz "Anything the group builds is new. There is no prescribed place for it". O `README.md` do `harness-template` diz "do not change the track repository as part of this assignment". Este PR segue o `harness-template`, que é o enunciado mais recente (commit de 2026-09-10 contra 2026-09-09 do track).
+
+**C12 — Dicionário de dados contra os modelos:**
+CONTRADICTION: `docs/data-dictionary.xlsx` (legível como zip; última revisão completa 2026-05-12, na aba 2) lista `staging.suggestions.was_self-served`, `marts.response_times.p50_minutes`, `marts.inventory_accuracy.stock_count_variance` e descreve `marts.self_service.closed_tickets` como "Tickets closed in the month"; os modelos têm `was_sent` e `is_self_served`, `marts.first_response_p50.first_response_minutes_p50`, nenhum mart `inventory_accuracy`, e `closed_tickets` conta todos os tickets do mês (C8). A própria aba 2 registra: "the module was renamed to Cycle Count in 2024 and the column name here was not changed with it". `docs/backlog.md` (ISSUE-35) fala em duas colunas; há pelo menos quatro divergências.
+
+**C13 — O ISSUE-13 que o INCIDENT-03 cita é outro problema:**
+CONTRADICTION: `docs/incidents/INCIDENT-03.md` diz "`ISSUE-13` in the Portal engineering backlog reports the same problem from the consumer end" (a falta de lista de consumidores); em `../portwell-engineering/docs/backlog.md:13` e `data/tracker.csv:5`, `ISSUE-13` é "No link between an escalation and its issue", sem relação com consumidores de métricas. A dependência cruzada que o incidente declara não existe no outro track com esse identificador.
+
+**C14 — REQUEST-009 e o POLICY-11:**
+CONTRADICTION: `data/requests/REQUEST-009.docx` diz "`POLICY-11` allows quoting an observed p50 where the account has more than 20 closed tickets" e que o que foi enviado foi "a first-response median for August only", e ainda que a janela "is not something the policy addresses". O `POLICY-11` não está em `docs/policies.md` deste track; ele existe em `../portwell-product/docs/Policies.docx`: "Support may quote a resolution time from the tier commitment table, or from the trailing ninety day observed median where the account has more than twenty closed tickets. Owner: Gabriela Rocha. Current since 2026-07-01." O policy fala de tempo de resolução, não de primeira resposta, e fixa a janela em noventa dias. Além disso, o p50 de agosto da Nordkai publicado (41, `warehouse-export-2026-08-29.csv`) não se reproduz hoje (100, C7).
+
+**C15 — TICKET-004424 não é a pergunta que o INCIDENT-03 descreve:**
+CONTRADICTION: `docs/incidents/INCIDENT-03.md`, escrito em 2026-08-06, diz que a Sunder "saw their self-service figure change between the June and July service review packs" e que "`TICKET-004424` is that question", e que "The customer was given an explanation two days later"; em `data/ops-extract/ticket.csv`, `TICKET-004424` foi aberto em 2026-08-20, catorze dias depois do incidente, com o texto "The self-service figure on our dashboard dropped by six points this month with no change on our side", e segue com status `open`. O ticket fala do dashboard, não do pack, e de uma queda; o pack de julho mostra uma alta de 0 para 0.3478 (C6). `docs/dependencies.md` diz que o portal "serves an unpinned latest". Qual número o cliente viu cair, e se a explicação chegou a ser dada, é UNKNOWN.
+
 **C5 — POLICY-13 vs. output dos marts:**
 CONTRADICTION: `docs/policies.md` POLICY-13 exige que "toda figura em pack voltado ao cliente nomeie a definição de métrica e a versão com que foi calculada"; `project/models/marts/self_service.sql` emite `self_service_rate` sem qualquer campo de versão; `docs/policies.md` confirma: "Marts emitem números sem versão."
 
@@ -101,6 +116,27 @@ Medido em 2026-09-29 com `make build` (6 de 6 testes passam) contra os números 
 Nas três contas dos dois exports (ACCOUNT-1001, 1003, 1008): `self_service_rate` bate em 6 de 6; `tickets`, `attainment` e `first_response_p50` diferem em 18 de 18. Recalculado em memória com `actor IN ('agent', 'assist')`, os 18 valores publicados se reproduzem exatamente. O pack de julho da Sunder (`../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx`, B13 e B14) cita 0.2696 e 70.
 
 Não registrado em lugar nenhum: quando o actor deixou de se chamar `portal`, e se os exports foram gerados com outro filtro ou com outro extract. Consequência: a figura contratual do pack não pode ser reconstruída a partir do repositório hoje, e um rebuild do mês publicaria outro número sem nenhum teste falhar.
+
+---
+
+## Dependências com outros tracks
+
+Fontes: `docs/dependencies.md` deste track e dos tracks vizinhos, lidos sem alteração em 2026-09-29.
+
+| Direção | Track | O quê | Como chega | O que alguém verifica | Fonte |
+| :- | :- | :- | :- | :- | :- |
+| Consome | Engineering (`portwell-engineering`) | O banco operacional, lido como schema `ops` | Extract manual em CSV. `run.py --live` aponta para `../portwell-portal/data/portwell_ops.db`, que não existe neste workspace | Nada sobre schema ou significado das colunas. O C7 é uma mudança de valor que nada detectou | `docs/dependencies.md`; `../portwell-engineering/docs/dependencies.md`; `project/run.py` |
+| Publica | Knowledge e Reporting (`portwell-knowledge`) | Figuras mensais por conta e volumes por área | CSV com cabeçalho `# from:` e `# sent:`, ou números colados em mensagem. Três exports para dois meses em `data/figures/` | Que as contas são as três esperadas. Nada sobre período, extract ou versão | `../portwell-knowledge/docs/dependencies.md` |
+| Publica | Portal engineering | `project/metrics/metric-definitions.yaml` | Lido sem fixar versão | Nada | `docs/dependencies.md`; `../portwell-engineering/docs/dependencies.md` |
+| Publica | Product (`portwell-product`) | Números sob pedido: REQUEST-005, 009, 010 e 014 | Mensagem e slide | Nada. O slide do REQUEST-005 saiu sem a ressalva | `data/requests/inbox.csv`; `data/requests/REQUEST-005.docx`; `data/requests/REQUEST-009.docx` |
+
+O que os tracks vizinhos mostram sobre as nossas figuras:
+
+- Os packs são contratuais: "Five business days after month end" (`../portwell-knowledge/docs/dependencies.md`). Finance lê três células do pack sem contrato.
+- `../portwell-knowledge/data/figures/` tem dois exports de julho: 2026-08-01, "July figures, first cut", e 2026-08-06, "A late batch of tickets landed after the first cut. Use this one." A ACCOUNT-1001 passou de 91 para 95 tickets entre os dois. O extract atual reproduz o segundo.
+- O pack de julho da Sunder (`../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.docx`) diz "Automation rate for the quarter to date is 41 per cent". Nenhum dos três exports tem essa coluna. `ISSUE-52` no backlog de knowledge ("Self-service and automation rate may be the same number", owner Henrik Sole) e o REQUEST-011 aqui são o mesmo problema visto dos dois lados, e nenhum tem resposta.
+- O mesmo pack lista `ESCALATION-0421`, "Reporting figure differs from the portal", aberta há 4 dias no fim de julho.
+- A identidade da empresa diverge entre tracks: o `CLAUDE.md` deste track descreve a Portwell Software, que vende um WMS; `../portwell-engineering/CLAUDE.md:3` descreve uma empresa que oferece contas correntes empresariais. Registrado, não resolvido.
 
 ---
 
