@@ -14,7 +14,8 @@
 - No approval is recorded by any skill. Skills prepare decision packages; approvals are human acts.
 
 **Non-goals:**
-- No hooks, tools, permissions, or state-engine code (Module 2 scope).
+- No tools, permissions, or state-engine code (Module 2 scope). One exception, recorded under Decision record:
+  a PreToolUse hook that refuses Write, Edit, MultiEdit and NotebookEdit under `portwell-analytics/`.
 - No fixes to `portwell-analytics` models, tests, or data.
 - No resolution of the structural contradiction that prevents `self_service_rate` v3 from being computed (C6).
 
@@ -151,6 +152,17 @@ Full trace: `traces/worked-case.md` §"Trace 2 — Held-out: REQUEST-007."
 
 **Contradictions registered but not resolved:**
 C1 (mart v2 vs. definition v3), C2 (incident index incomplete), C3 (REQUEST-007/011 possible duplicate), C4 (extract period not compared to reporting period in pipeline), C5 (POLICY-13 not enforced by any mart), C6 (INCIDENT-03 root-cause attribution structurally impossible). Full details: `notes/findings.md` §Contradições.
+
+---
+
+## Decision record
+
+**The read-only hook is kept, and fixed, ahead of Module 2.** The first version never blocked: it read
+`file_path` at the top of the payload instead of `tool_input.file_path`, exited 1 (only exit 2 blocks),
+and used `onFailure` and `blockMessage`, which are not hook fields. Keeping a control the PR declares,
+rather than deleting it, was the group's choice; the trade-off is building one Module 2 interception
+point early. What it still does not cover (Bash writes, sessions opened inside the track repository) is
+in `notes/findings.md` under "Controle de leitura do track (hook)".
 
 ---
 

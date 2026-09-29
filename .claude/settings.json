@@ -2,13 +2,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c \"import sys, json; inp=json.load(sys.stdin); path=inp.get('file_path',''); sys.exit(1 if 'portwell-analytics' in path else 0)\"",
-            "onFailure": "block",
-            "blockMessage": "SPEC Rule 1: portwell-analytics is read-only. No writes or edits permitted in this repository."
+            "command": "python3 -c \"import sys, json; ti = json.load(sys.stdin).get('tool_input', {}); p = ti.get('file_path') or ti.get('notebook_path') or ''; bad = '/portwell-analytics/' in p; bad and print('Blocked: portwell-analytics is the track repository and is read-only. Write under harness-template instead.', file=sys.stderr); sys.exit(2 if bad else 0)\""
           }
         ]
       }

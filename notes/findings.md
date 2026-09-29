@@ -119,6 +119,22 @@ Não registrado em lugar nenhum: quando o actor deixou de se chamar `portal`, e 
 
 ---
 
+## Controle de leitura do track (hook)
+
+Decisão do grupo em 2026-09-29: manter o hook de `PreToolUse` em `.claude/settings.json` e corrigi-lo, embora seja escopo do Módulo 2 ("one interception point"). Motivo: o PR já declarava esse controle, e um controle declarado que não funciona é pior do que nenhum.
+
+**Vermelho, antes da correção.** O comando lia `file_path` na raiz do payload, mas o Claude Code envia `tool_input.file_path`. Com o payload real, o comando saía com 0 e não bloqueava nada. Mesmo com o campo certo, sair com 1 não bloqueia (o bloqueio é exit 2), e `onFailure` e `blockMessage` não são campos de hook.
+
+**Verde, depois.** O comando lê `tool_input.file_path` (e `notebook_path`), sai com 2 e explica no stderr quando o caminho está sob `/portwell-analytics/`. Testado com cinco payloads: bloqueia Write, Edit e NotebookEdit no track, e libera escrita no harness, inclusive a de um arquivo cujo nome menciona o track.
+
+O que o hook não cobre:
+
+- Escrita via Bash: `sed -i`, redirecionamento com `>`, um script Python que grava arquivo, ou `git` dentro do track.
+- Ele só vale quando o Claude Code roda com `harness-template` como projeto. Uma sessão aberta no `portwell-analytics` usa o `.claude/settings.json` de lá, que permite `Edit(./**)` e `Write(./**)`.
+- Ele não bloqueia os artefatos que o build gera no track (`warehouse.duckdb` e `.venv/`), e nem deve: os dois estão no `.gitignore`. A checagem que vale é `git -C ../portwell-analytics status --porcelain` vazio depois de cada execução.
+
+---
+
 ## Dependências com outros tracks
 
 Fontes: `docs/dependencies.md` deste track e dos tracks vizinhos, lidos sem alteração em 2026-09-29.
