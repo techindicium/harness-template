@@ -1,7 +1,10 @@
 group: grupo-5
 track: DDLC
+context_repository: ../portwell-analytics  # local path, relative to this repository
 team: Analytics
 process: "The month's figures are produced"
+work_item: REQUEST-007  # executed through the skills; evidence in evidence/*-REQUEST-007.md
+retrospective_case: INCIDENT-03  # counterfactual trace, not executed
 managed_item: "metric or data model"
 
 context:
@@ -177,3 +180,10 @@ members:
       (C1–C6); designed the 9-stage lifecycle and 5 exception states; wrote
       lifecycle.md (Parts 1 and 2), 9 skill files, traces/worked-case.md,
       notes/source-inventory.md, and notes/findings.md.
+  - name: Yuri Alves
+    email: yuri.alves@indicium.ai
+    role: >
+      Ran the build and compared the warehouse with the figures Reporting
+      received (C7); narrowed C6 and added C8 to C15 with the cross-track
+      dependencies; fixed the read-only hook; restored the template keys and
+      columns; ran REQUEST-007 through the skills and recorded the evidence.
