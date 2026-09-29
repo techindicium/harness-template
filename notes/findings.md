@@ -119,6 +119,21 @@ Não registrado em lugar nenhum: quando o actor deixou de se chamar `portal`, e 
 
 ---
 
+## O que a execução do trace mostrou sobre as skills
+
+Fonte: a execução do REQUEST-007 em 2026-09-29 (`evidence/*-REQUEST-007.md`, `traces/worked-case.md` Trace 2). As skills não foram alteradas; os pontos abaixo são propostas para revisão do grupo.
+
+| Skill | O que aconteceu | Proposta |
+| :- | :- | :- |
+| `intake` | A condição de entrada "No existing open item for this request has already been registered" exclui o próprio REQUEST-007, que já está no inbox sem nota de intake | Tratar item já registrado sem nota de intake como re-intake, sem novo identificador |
+| `intake` | O passo 1 procura duplicata só com o mesmo solicitante; REQUEST-011 é de outra pessoa. Quem pegou a duplicata foi a condição de parada | Comparar prazo e resumo, independentemente do solicitante |
+| `intake` | Não há campo para o período de reporte, que a `context` precisa ler | Registrar `reporting_period` na nota de intake |
+| `context`, `act`, `verify` | A `context` deixa um humano aceitar um período parcial; a `act` exige "period confirmed to match" e a `verify` para em qualquer divergência de período. A decisão humana não tem caminho adiante | Dar às três o mesmo campo: `period_match: accepted_partial`, com quem aceitou |
+| `route` | POLICY-06 foi avaliado só para `rebuild.py`. `run.py` faz `CREATE OR REPLACE TABLE` em todos os modelos, e o policy não define "destructive" | Registrar como UNKNOWN e perguntar ao dono do policy (Sofia Marques) |
+| `verify` | A comparação com a última entrega não está na skill; foi ela que mostrou o C7 de forma direta | Acrescentar o passo "reconstruir a última figura entregue e comparar" |
+
+---
+
 ## Controle de leitura do track (hook)
 
 Decisão do grupo em 2026-09-29: manter o hook de `PreToolUse` em `.claude/settings.json` e corrigi-lo, embora seja escopo do Módulo 2 ("one interception point"). Motivo: o PR já declarava esse controle, e um controle declarado que não funciona é pior do que nenhum.
