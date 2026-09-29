@@ -38,9 +38,29 @@ Generated during Phase 1 reading. All files from `portwell-analytics` (TRACK_REP
 | `data/requests/REQUEST-011.docx` | Request de Henrik Sole (Reporting): "automation rate" por conta Enterprise para agosto; possível duplicata de REQUEST-007 não investigada | 2026-08-18 | Henrik Sole |
 | `data/requests/REQUEST-005.docx` | Request de Product (Ana Fialho): pilot accounts resolvem mais rápido que não-pilot | UNKNOWN (received 2026-07-30) | Ana Fialho |
 | `data/requests/REQUEST-009.docx` | Request de Product (Gabriela Rocha): número para conversa de renovação Nordkai | UNKNOWN (received 2026-08-14) | Gabriela Rocha |
-| `docs/data-dictionary.xlsx` | Dicionário de dados — não legível (formato binário xlsx) | UNKNOWN | UNKNOWN |
+| `docs/data-dictionary.xlsx` | Dicionário de dados, lido como zip: 10 colunas descritas na aba 1 e lacunas conhecidas na aba 2; divergências registradas em C12 | 2026-05-12 (última revisão completa, aba 2) | UNKNOWN ("Kept by hand") |
+| `docs/dependencies.md` | O que o track consome (banco operacional) e publica (definições, três marts sem contrato); a lista de consumidores que não existe | UNKNOWN | UNKNOWN |
+| `docs/architecture-rules.md` | Seis regras, uma só com enforcement; tabela de blast radius | UNKNOWN | UNKNOWN |
+| `docs/backlog.md` | ISSUE-30 a ISSUE-39, com owner e notas; ISSUE-34 e ISSUE-38 sem owner | UNKNOWN | UNKNOWN |
+| `data/README.md` | Descrição genérica dos dados, com o bloco SEED não preenchido | UNKNOWN | UNKNOWN |
 | `docs/pr-notes/0088-self-service-v3.md` | Nota de mudança: self_service v3 merged 2026-06-27, effective 2026-07-01; mart não atualizado | 2026-06-27 (merged) | Sofia Marques (autor); Declan Byrne (reviewer) |
 | `docs/policies.md` | 4 políticas formais (POLICY-03, 05, 06, 13) + regras de hábito; nenhuma é enforced pelo código | UNKNOWN | UNKNOWN |
 | `docs/identifiers.md` | Esquema de identificadores: owned (REQUEST-NNN, metric name+version) e borrowed (ACCOUNT, TICKET, SUGGESTION) | UNKNOWN | UNKNOWN |
 
-**Nota:** `docs/interviews/` contém arquivo .docx não legível diretamente pelo Read tool; conteúdo extraído via zip/XML parsing. `docs/data-dictionary.xlsx` é binário e não foi lido.
+**Nota:** `docs/interviews/` contém arquivo .docx não legível diretamente pelo Read tool; conteúdo extraído via zip/XML parsing. `docs/data-dictionary.xlsx` foi lido da mesma forma (zip/XML).
+
+## Fontes de outros tracks
+
+Lidas sem alteração em 2026-09-29, para registrar dependências e testar figuras publicadas.
+
+| Fonte | O que contém | Data | Autor |
+|-------|-------------|------|-------|
+| `../portwell-knowledge/data/figures/warehouse-export-2026-08-01.csv` | Julho, "first cut": três contas Enterprise, SLA, self-service e p50 | 2026-08-01 (`# sent:`) | Declan Byrne (`# from:`) |
+| `../portwell-knowledge/data/figures/warehouse-export-2026-08-06.csv` | Julho de novo, "A late batch of tickets landed after the first cut. Use this one." | 2026-08-06 (`# sent:`) | Declan Byrne (`# from:`) |
+| `../portwell-knowledge/data/figures/warehouse-export-2026-08-29.csv` | Agosto, "August figures for the packs" | 2026-08-29 (`# sent:`) | Declan Byrne (`# from:`) |
+| `../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx` e `.docx` | Pack de julho da Sunder: attainment 0.2696, p50 70, self-service 0.3478, self-service anterior 0, "automation rate" 41 por cento, ESCALATION-0421 | UNKNOWN | Lucia Ferreira ("Prepared by") |
+| `../portwell-knowledge/docs/dependencies.md` | Como knowledge recebe as figuras: CSV ou mensagem, sem versão, sem registro de qual export gerou cada pack | UNKNOWN | UNKNOWN |
+| `../portwell-knowledge/docs/backlog.md` | ISSUE-52, self-service contra automation rate | UNKNOWN | UNKNOWN |
+| `../portwell-engineering/docs/dependencies.md` | O banco operacional publicado para analytics sem contrato; definições de métrica lidas sem fixar versão | UNKNOWN | UNKNOWN |
+| `../portwell-engineering/docs/backlog.md` | ISSUE-13, "No link between an escalation and its issue" (C13) | UNKNOWN | UNKNOWN |
+| `../portwell-product/docs/Policies.docx` | POLICY-11, citado pelo REQUEST-009 e ausente de `docs/policies.md` deste track (C14) | 2026-06-02 ("Last reviewed") | Ana Fialho ("Maintained by") |

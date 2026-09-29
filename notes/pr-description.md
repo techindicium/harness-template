@@ -14,11 +14,13 @@
 - No approval is recorded by any skill. Skills prepare decision packages; approvals are human acts.
 
 **Non-goals:**
-- No hooks, tools, permissions, or state-engine code (Module 2 scope).
+- No tools, permissions, or state-engine code (Module 2 scope). One exception, recorded under Decision record:
+  a PreToolUse hook that refuses Write, Edit, MultiEdit and NotebookEdit under `portwell-analytics/`.
 - No fixes to `portwell-analytics` models, tests, or data.
-- No resolution of the structural contradiction that prevents `self_service_rate` v3 from being computed (C6).
+- No resolution of the contradiction about what moved the Sunder Retail Supply figure (C6, C15).
+- No fix to the marts: C7 and C8 are recorded, and the executed trace escalates them to the Analytics team.
 
-**Owners:** Gabriel Campos (gabriel.campos@indicium.tech)
+**Owners:** Gabriel Campos (gabriel.campos@indicium.tech), Yuri Alves (yuri.alves@indicium.ai)
 
 **Acceptance criteria (from SPEC §7):**
 - `lifecycle.md` with current-process table and proposed lifecycle
@@ -45,9 +47,11 @@
 | `skills/handoff/SKILL.md` | Delivers as file with provenance header; refuses message delivery; creates consumer log |
 | `skills/observe/SKILL.md` | Monitors consumer citations; triggers Recover on definition changes |
 | `skills/recover/SKILL.md` | Three paths (rebuild, restatement, retirement); notifies all consumers from Observe log |
-| `traces/worked-case.md` | INCIDENT-03: 12-step retrospective trace with 3 catch points; REQUEST-007: 13-step prospective trace with duplicate flag + period gap |
+| `traces/worked-case.md` | INCIDENT-03: 12-step counterfactual trace with 3 catch points; REQUEST-007: 7-step trace executed through the skills, ending Escalated at Verify with Approve refusing |
+| `evidence/*-REQUEST-007.md` | What each skill wrote when it ran: intake, context, route, build (with the full `run.py` output), verify, and the approve refusal |
+| `.claude/settings.json` | PreToolUse hook that refuses Write, Edit, MultiEdit and NotebookEdit under `portwell-analytics/` (see Decision record) |
 | `notes/source-inventory.md` | 35+ sources from `portwell-analytics`, each with date and author (or UNKNOWN) |
-| `notes/findings.md` | 9 sections: described vs. practised process, divergences, 6 contradictions (C1–C6), tracker inconsistencies, what the 6 shape tests verify and cannot see, versioned metrics, manual handoffs, trace candidates |
+| `notes/findings.md` | Described vs. practised process, divergences, 15 contradictions (C1–C15), dependencies on other tracks, the read-only hook, what the executed trace showed about the skills, tracker inconsistencies, what the 6 shape tests verify and cannot see, versioned metrics, manual handoffs, trace candidates |
 
 ---
 
@@ -90,6 +94,22 @@ No mart emits a version field. POLICY-13 (`docs/policies.md`) requires that figu
 **P3 — No consumer list** (`lifecycle.md` Part 1, step 3):
 POLICY-05 requires announcing definition changes one reporting period ahead. This is structurally impossible without knowing who consumes each metric. No consumer list exists. Source: ISSUE-30 in `data/tracker.csv` ("No list of who consumes which metric"), `docs/incidents/INCIDENT-03.md` ("Nobody was told").
 
+### Red, measured — the published figures do not rebuild
+
+`make build` on the track repository passes all 6 tests, and it does not reproduce what Reporting
+received. `marts/first_response.sql` counts `actor IN ('agent', 'portal')`, and the extract names
+the portal's reply `assist`, so 296 of 1234 tickets drop out of first response and SLA attainment
+(C7).
+
+| Export (`../portwell-knowledge/data/figures/`) | Account | Field | Published | Today |
+| :- | :- | :- | -: | -: |
+| `warehouse-export-2026-08-06.csv` (July) | ACCOUNT-1008 | attainment | 0.2696 | 0.08 |
+| `warehouse-export-2026-08-06.csv` (July) | ACCOUNT-1008 | first_response_p50 | 70 | 103 |
+| `warehouse-export-2026-08-29.csv` (August) | ACCOUNT-1008 | attainment | 0.3966 | 0.0952 |
+
+Across both exports, self-service matches 6 of 6 and the other figures differ 18 of 18. Counting
+`assist` as a response reproduces all of them. The same 6 tests also pass on empty tables (C9).
+
 ### Green — how the proposed lifecycle detects or blocks each loss point
 
 **P1 → Context field check** (`traces/worked-case.md`, INCIDENT-03 trace step 3):
@@ -104,19 +124,24 @@ The Approve package states `definition_version_in_effect` and `policy_13_citatio
 **P3 → Handoff consumer log** (`skills/handoff/SKILL.md`, step 6):
 The consumer log is created at the first Handoff and maintained at every subsequent delivery. This is the mechanism that makes POLICY-05 actionable — for the first time, there is a list of who received which version for which period.
 
-### Held-out — REQUEST-007
+### Second case, executed — REQUEST-007
 
-REQUEST-007 (Lucia Ferreira, Reporting, self-service per account for August 2026 packs, deadline 2026-09-04) was not used to design the lifecycle. Source: `data/requests/REQUEST-007.docx`, `data/requests/inbox.csv`.
+REQUEST-007 (Lucia Ferreira, Reporting, self-service per account for the August 2026 packs) was not
+used to design the lifecycle. It was run through the skills on 2026-09-29, and each skill wrote its
+evidence under `evidence/`. Human stops were answered by a group member playing the named role,
+marked `simulated: true`.
 
-The lifecycle covers it, surfacing two issues that INCIDENT-03 did not expose:
+1. **Intake stops** on a suspected duplicate of REQUEST-011. The question is deferred, not resolved.
+2. **Context stops twice:** the extract ends on 2026-08-27, and `human_edit_material` (v3) is absent.
+   The simulated decisions label the figures as partial August and compute v2.
+3. **Route stops** on POLICY-05: the v3 change was never announced and there is no consumer list.
+4. **Act builds**: exit 0, all 6 tests pass.
+5. **Verify blocks**: v2 differs from the mart on denominator and period (C8), and the skill's own
+   first-response check finds the dropped `assist` actor (C7).
+6. **Approve refuses**: no package, no `approved_by`.
 
-1. **Duplicate flag at Intake:** REQUEST-007 and REQUEST-011 have the same deadline and overlapping summaries. The tracker note records: "ninguém perguntou se eles querem o mesmo número" (`data/tracker.csv`). The Intake skill escalates before any work begins. Resolution is UNKNOWN at time of writing.
-
-2. **Extract coverage gap at Context:** The August extract manifest declares coverage through 2026-08-28. August ends 2026-08-31 — three days short. The current process has no period check (`project/run.py` docstring: "Nothing here compares that date to the period being reported on"). The Context skill catches the gap and requires clarification before proceeding.
-
-3. **Same structural block as INCIDENT-03:** `human_edit_material` absent from extract → blocked at Context for v3. This confirms the constraint is systemic, not a one-off.
-
-Full trace: `traces/worked-case.md` §"Trace 2 — Held-out: REQUEST-007."
+Final state: Escalated to the Analytics team. Nothing was delivered. Full trace:
+`traces/worked-case.md` §"Trace 2 — Executed: REQUEST-007".
 
 ---
 
@@ -124,14 +149,18 @@ Full trace: `traces/worked-case.md` §"Trace 2 — Held-out: REQUEST-007."
 
 **Shared interfaces respected:**
 - Track repository accessed read-only throughout. No commits, edits, or writes to `portwell-analytics`.
-- Skill evidence artifacts are produced in the harness (`claude_ddlc/evidence/`), not in the track repository.
+- Skill evidence artifacts are produced in the harness (`evidence/`), not in the track repository. Running the build writes `warehouse.duckdb` and `.venv/` in the track root; both are gitignored, and `git status` there stayed empty.
 - Lifecycle states, exception states, and evidence artifact names follow the patterns defined in the harness template.
 
-**New artifact introduced:**
-- `evidence/consumer-log.md`: the consumer log created at Handoff and maintained by Observe. This artifact does not exist in `portwell-analytics` today (ISSUE-30). Future modules that implement POLICY-05 enforcement will need to read from this log.
+**New artifact designed, not yet produced:**
+- `evidence/consumer-log.md`: the consumer log the `handoff` skill creates and `observe` maintains. This artifact does not exist in `portwell-analytics` today (ISSUE-30), and the executed REQUEST-007 trace does not create it either: Verify blocked the item before Approve, so it never reached Handoff (`traces/worked-case.md` §"Trace 2 — Executed"). The design is in `skills/handoff/SKILL.md`; the first real Handoff run is what will produce this file.
 
 **Dependencies on other groups/tracks:**
-- The Portwell help portal (`ops.suggestion` table) is the upstream source of the extract data. Changes to the portal schema (e.g., adding `human_edit_material`) would unblock `self_service_rate` v3 for every team consuming it. No cross-group coordination was required in Module 1 scope.
+- **Engineering** publishes the operational database with no written contract (`../portwell-engineering/docs/dependencies.md`). A value rename there (C7) and a missing field (`human_edit_material`) both reach this track silently.
+- **Knowledge and Reporting** consume our figures as CSV or pasted numbers, with no version, and cannot say which export a pack was built from (`../portwell-knowledge/docs/dependencies.md`). Their ISSUE-52 and our REQUEST-011 are the same open question.
+- **Product** consumes figures by request (REQUEST-005, REQUEST-009). POLICY-11, cited by REQUEST-009, is defined in `../portwell-product/docs/Policies.docx` and does not cover what was sent (C14).
+- INCIDENT-03 cites `ISSUE-13` in the Portal engineering backlog as the same problem; `ISSUE-13` there is a different problem (C13).
+- Full table: `notes/findings.md` §"Dependências com outros tracks".
 
 ---
 
@@ -139,18 +168,33 @@ Full trace: `traces/worked-case.md` §"Trace 2 — Held-out: REQUEST-007."
 
 | Item | Detail | Source |
 |------|--------|--------|
-| C6 — Real cause of INCIDENT-03 is UNKNOWN | The attributed cause (v2→v3 transition) is structurally impossible; v3 was never computable; the actual reason the Sunder Retail Supply figure changed is not established | `notes/findings.md` §C6; `data/ops-extract/suggestion.csv`; `project/models/staging/stg_suggestions.sql` |
+| C6 — Real cause of INCIDENT-03 is UNKNOWN | The attributed cause (v2→v3) conflicts with change note 0088 (mart still on v2) and with the July pack (self-service 0 to 0.3478); the July extract's columns are UNKNOWN; the ticket the incident cites was opened later, about the dashboard (C15) | `notes/findings.md` §C6, §C15 |
 | Analytics lead name is UNKNOWN | Approve requires a named approver; POLICY-06 requires a named approver for destructive transforms; the Analytics lead who wrote INCIDENT-03 is not identified | `docs/incidents/INCIDENT-03.md` |
 | `self_service_rate` v3 structurally blocked | Every request for v3 will block at Context until `data/ops-extract/suggestion.csv` includes `human_edit_material`; this requires a change to the extract query and to the operational database schema | `data/ops-extract/suggestion.csv`; `project/metrics/metric-definitions.yaml` |
 | Consumer log does not exist today | The first real execution of the lifecycle must retroactively populate it with the three consumers identified in INCIDENT-03 | ISSUE-30, `data/tracker.csv`; `docs/incidents/INCIDENT-03.md` |
 | `suggestion_acceptance_rate` v1 has no mart | Any request for this metric blocks at Route (no implementation to build from) | `project/metrics/metric-definitions.yaml`; glob of `project/models/marts/` |
 | `docs/systems.md` not found | Phase 0 required reading this file; it does not exist in the track repository. System information derived from interview and incident sources only | `docs/` directory listing |
 | `course-shared/tools/mock-systems.json` not found | Separate repository not cloned; systems list in `track.yaml` marked UNKNOWN | Phase 0 notes |
-| `docs/data-dictionary.xlsx` not read | Binary format; alignment between data dictionary and current models not verified | `notes/source-inventory.md` |
+| `docs/data-dictionary.xlsx` is out of date | Read as a zip; at least four divergences from the models | `notes/findings.md` §C12 |
+| Published figures do not rebuild | SLA attainment and p50 in the packs cannot be reproduced from the repository today; fixing it means changing the track's marts | `notes/findings.md` §C7 |
+| Human decisions in the executed trace are simulated | A group member played Declan Byrne, Sofia Marques and Lucia Ferreira; none of those decisions was taken by them | `evidence/*-REQUEST-007.md` |
+| The executed trace stops at Verify | Handoff, Observe and Recover have not run against a real item | `traces/worked-case.md` Trace 2 |
+| The hook does not cover Bash writes | `sed -i`, redirects or scripts can still write into the track; sessions opened inside the track use its own permissions | `notes/findings.md` §"Controle de leitura do track (hook)" |
 | Lifecycle is descriptive only (Module 1) | All transitions depend on human discipline. No state engine enforces them. Each "stop" in a skill is a documented instruction, not a technical block | SPEC §1 non-goals |
 
 **Contradictions registered but not resolved:**
-C1 (mart v2 vs. definition v3), C2 (incident index incomplete), C3 (REQUEST-007/011 possible duplicate), C4 (extract period not compared to reporting period in pipeline), C5 (POLICY-13 not enforced by any mart), C6 (INCIDENT-03 root-cause attribution structurally impossible). Full details: `notes/findings.md` §Contradições.
+C1 (mart v2 vs. definition v3), C2 (incident index incomplete), C3 (REQUEST-007/011 possible duplicate), C4 (extract period not compared to reporting period in pipeline), C5 (POLICY-13 not enforced by any mart), C6 (INCIDENT-03 cause conflicts with change note 0088 and the July pack), C7 (first response drops the `assist` actor; published figures do not rebuild), C8 (v2 denominator, period and grain differ from the mart), C9 (the 6 tests pass on empty tables), C10 (extract_metadata records build time), C11 (course layer on where the harness lives), C12 (data dictionary), C13 (ISSUE-13), C14 (POLICY-11 against REQUEST-009), C15 (TICKET-004424 against INCIDENT-03). Full details: `notes/findings.md` §Contradições.
+
+---
+
+## Decision record
+
+**The read-only hook is kept, and fixed, ahead of Module 2.** The first version never blocked: it read
+`file_path` at the top of the payload instead of `tool_input.file_path`, exited 1 (only exit 2 blocks),
+and used `onFailure` and `blockMessage`, which are not hook fields. Keeping a control the PR declares,
+rather than deleting it, was the group's choice; the trade-off is building one Module 2 interception
+point early. What it still does not cover (Bash writes, sessions opened inside the track repository) is
+in `notes/findings.md` under "Controle de leitura do track (hook)".
 
 ---
 
@@ -170,4 +214,5 @@ The executable lifecycle (Module 2) would add:
 
 | Person | Contribution |
 |--------|-------------|
-| Gabriel Campos | Read and inventoried all 35+ track-repo sources; identified 6 contradictions (C1–C6) including the structurally impossible root cause in INCIDENT-03 (C6); designed the 9-stage lifecycle and 5 exception states; wrote all deliverables: `lifecycle.md` (Parts 1 and 2), 9 skill files, `traces/worked-case.md`, `notes/source-inventory.md`, `notes/findings.md`, `track.yaml`, and this PR description |
+| Gabriel Campos | Read and inventoried all 35+ track-repo sources; identified 6 contradictions (C1–C6), including the INCIDENT-03 root-cause question later narrowed in C6; designed the 9-stage lifecycle and 5 exception states; wrote all deliverables: `lifecycle.md` (Parts 1 and 2), 9 skill files, `traces/worked-case.md`, `notes/source-inventory.md`, `notes/findings.md`, `track.yaml`, and this PR description |
+| Yuri Alves | Ran the build and compared the warehouse with the figures Reporting received (C7); narrowed C6 and added C8 to C15 with the dependencies on other tracks; fixed the read-only hook and recorded the decision; restored the template keys in `track.yaml` and the template columns in `lifecycle.md`; ran REQUEST-007 through the skills and wrote `evidence/*-REQUEST-007.md`; recorded the skill gaps the run exposed |
