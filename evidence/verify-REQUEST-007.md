@@ -8,7 +8,7 @@ commit `a8aecb4`, reading `warehouse.duckdb` with `read_only=True`. Operator: Yu
 | Condition | Result | Source |
 | :- | :- | :- |
 | The build evidence exists with `exit_code: 0` | Met | `evidence/build-REQUEST-007.md` |
-| The output has rows | Met: 10 August rows per mart | `evidence/build-REQUEST-007.md` |
+| The output has rows | Met: 10 August rows in `marts.self_service`, `marts.first_response_p50` and `marts.sla_attainment`. `marts.first_response` has no August-specific count in the build evidence, only a ticket-grain total (938) across all three months | `evidence/build-REQUEST-007.md` |
 
 ## Step 2: definition, field by field
 
@@ -35,10 +35,10 @@ commit `a8aecb4`, reading `warehouse.duckdb` with `read_only=True`. Operator: Yu
 | First response | first outbound interaction | first interaction with `actor IN ('agent', 'portal')` | **No** | The extract has `agent`, `assist` and `customer`. 151 August tickets answered only by `assist` drop out |
 | Minimum denominator | 20 | 20 | Yes | |
 
-August p50, as published in `../portwell-knowledge/data/figures/warehouse-export-2026-08-29.csv`
-and as built today: ACCOUNT-1001 41 against 100, ACCOUNT-1003 65 against 104, ACCOUNT-1008 38
-against 101. `marts.sla_attainment` inherits the gap: ACCOUNT-1008 0.3966 published against 0.0952
-today. See C7 in `notes/findings.md`.
+`marts.sla_attainment` inherits the gap, since it reads `marts.first_response`. Neither the p50
+nor the attainment published in `../portwell-knowledge/data/figures/` reproduces from today's
+build for any of the three Enterprise accounts. The comparison table is in C7,
+`notes/findings.md`.
 
 ## Step 3: period
 

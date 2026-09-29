@@ -171,6 +171,10 @@ contradictions_registered:
       - docs/incidents/INCIDENT-03.md
       - data/ops-extract/ticket.csv
       - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
+  - id: C16
+    summary: "REQUEST-007.docx states needed_by 2026-09-04 is five business days after month end; five business days after 2026-08-31 is 2026-09-07, not 2026-09-04. 2026-09-04 is four business days out"
+    sources:
+      - data/requests/REQUEST-007.docx
 
 members:
   - name: Gabriel Campos

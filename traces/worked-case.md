@@ -25,7 +25,7 @@ The evidence files named in this table (`evidence/*-REFRESH-2026-07.md`) were no
 
 The June 2026 reporting period has closed. The monthly refresh of `self_service_rate` is due for the July service review packs. This is the production cycle that generated the figures that triggered INCIDENT-03.
 
-In the current process (no lifecycle): build ran → figures delivered → customer pack published → Sunder Retail Supply (ACCOUNT-1008) questioned why the self-service figure changed between June and July packs → two-day investigation → incorrect root-cause attribution (INCIDENT-03 attributed change to v2→v3 transition; C6 in `notes/findings.md` documents that this is structurally impossible because `human_edit_material` — required by v3 — is absent from `data/ops-extract/suggestion.csv`). Source: `docs/incidents/INCIDENT-03.md`.
+In the current process (no lifecycle): build ran → figures delivered → customer pack published → Sunder Retail Supply (ACCOUNT-1008) questioned why the self-service figure changed between June and July packs → two-day investigation → root-cause attribution (INCIDENT-03 attributed the change to the v2→v3 transition). C6 in `notes/findings.md` registers this against two other sources that do not agree with it: change note 0088 says the mart still applies the v2 rule, and the July pack shows the figure moving from 0 to 0.3478. The July extract's own columns are UNKNOWN, so whether v3 was computable that month is not established either way; the real cause stays open. Source: `docs/incidents/INCIDENT-03.md`.
 
 This trace shows what the proposed lifecycle would have done at each stage.
 

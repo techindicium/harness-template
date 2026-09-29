@@ -94,6 +94,9 @@ CONTRADICTION: `docs/incidents/INCIDENT-03.md` diz "`ISSUE-13` in the Portal eng
 **C14 — REQUEST-009 e o POLICY-11:**
 CONTRADICTION: `data/requests/REQUEST-009.docx` diz "`POLICY-11` allows quoting an observed p50 where the account has more than 20 closed tickets" e que o que foi enviado foi "a first-response median for August only", e ainda que a janela "is not something the policy addresses". O `POLICY-11` não está em `docs/policies.md` deste track; ele existe em `../portwell-product/docs/Policies.docx`: "Support may quote a resolution time from the tier commitment table, or from the trailing ninety day observed median where the account has more than twenty closed tickets. Owner: Gabriela Rocha. Current since 2026-07-01." O policy fala de tempo de resolução, não de primeira resposta, e fixa a janela em noventa dias. Além disso, o p50 de agosto da Nordkai publicado (41, `warehouse-export-2026-08-29.csv`) não se reproduz hoje (100, C7).
 
+**C16 — O prazo do REQUEST-007 não bate com a própria justificativa:**
+CONTRADICTION: `data/requests/REQUEST-007.docx` diz "Needed by: 2026-09-04, which is five business days after month end". Agosto de 2026 termina numa segunda-feira (2026-08-31). Contando dias úteis a partir dali: 01/09 (BD1), 02/09 (BD2), 03/09 (BD3), 04/09 (BD4), 07/09 (BD5). Cinco dias úteis depois do fim do mês é 2026-09-07, não 2026-09-04; o dia citado é o quarto dia útil. O erro está no documento de origem, não numa transcrição: conferido lendo o `.docx` diretamente. Registrado como contradição, e não corrigido silenciosamente, porque copiar o prazo sem sinalizar é o mesmo tipo de falha que as demais 15 contradições catalogam.
+
 **C15 — TICKET-004424 não é a pergunta que o INCIDENT-03 descreve:**
 CONTRADICTION: `docs/incidents/INCIDENT-03.md`, escrito em 2026-08-06, diz que a Sunder "saw their self-service figure change between the June and July service review packs" e que "`TICKET-004424` is that question", e que "The customer was given an explanation two days later"; em `data/ops-extract/ticket.csv`, `TICKET-004424` foi aberto em 2026-08-20, catorze dias depois do incidente, com o texto "The self-service figure on our dashboard dropped by six points this month with no change on our side", e segue com status `open`. O ticket fala do dashboard, não do pack, e de uma queda; o pack de julho mostra uma alta de 0 para 0.3478 (C6). `docs/dependencies.md` diz que o portal "serves an unpinned latest". Qual número o cliente viu cair, e se a explicação chegou a ser dada, é UNKNOWN.
 
@@ -224,7 +227,7 @@ Source: `project/metrics/metric-definitions.yaml` (published_at 2026-08-20, owne
 | `first_response_minutes_p50` | v1 | current | 2026-02-01 | **Não alinhado** (C7): mediana e minimum_denominator de 20 estão implementados, mas "first outbound interaction" filtra `actor IN ('agent', 'portal')` e o extract chama a resposta do portal de `assist`; 296 tickets ficam fora |
 | `suggestion_acceptance_rate` | v1 | current | 2026-06-15 | **Nenhum mart correspondente encontrado** |
 
-**Data dictionary:** `docs/data-dictionary.xlsx` não foi lido (arquivo binário). Alinhamento com os modelos não verificado.
+**Data dictionary:** `docs/data-dictionary.xlsx` foi lido como zip (ver C12). O alinhamento com os modelos foi verificado, e diverge em pelo menos quatro pontos.
 
 **Desalinhamento crítico:** o mart `self_service.sql` foi atualizado para refletir a intenção do autor mas a implementação ainda é v2. Conforme `docs/pr-notes/0088-self-service-v3.md`: "A intenção era atualizar o mart assim que junho fechasse. Isso não aconteceu." O mart está produzindo números com uma definição supersedida enquanto `metric-definitions.yaml` declara v3 como vigente.
 
@@ -258,10 +261,10 @@ Source: `data/tracker.csv`, `data/requests/REQUEST-007.docx`, `data/requests/inb
   - Exemplifica o processo mensal completo ponta a ponta: extract → build → handoff → pack.
   - Liga-se diretamente ao INCIDENT-03: a definição mudou em julho, o pack de julho foi construído sem avisar ninguém, Sunder Retail Supply questionou a mudança.
   - Expõe a contradição C1 (mart v2 vs. definição v3 vigente).
-  - Item ativo com deadline real (2026-09-04): o trace é prospectivo.
+  - Item ativo com deadline real (2026-09-04, embora o cálculo do próprio request esteja errado: ver C16).
   - REQUEST-007 é explícito: "não diz qual versão da definição usar, e a definição mudou em 2026-07-01".
 - **Contras:**
-  - REQUEST-011 pode ser duplicata (C3) e a duplicação nunca foi resolvida. O trace de REQUEST-007 pode ser bloqueado no estágio de Route enquanto a duplicação não for esclarecida.
+  - REQUEST-011 pode ser duplicata (C3) e a duplicação nunca foi resolvida. Esta era a previsão, feita antes de rodar o trace: que o item ficaria preso em Route por causa disso. Executado em 2026-09-29, o item parou um estágio antes, no Intake, porque a própria condição de entrada da skill falha para um item já registrado (`traces/worked-case.md` §"Trace 2 — Executed", passo 1).
 
 ### Candidato 2 — INCIDENT-03 (o número de self-service mudou entre junho e julho)
 
@@ -293,4 +296,4 @@ Source: `data/tracker.csv`, `data/requests/inbox.csv`
 
 **Trace principal: INCIDENT-03** — é o caso com o maior número de evidências, o red state mais claro (testes passaram, número errado publicado, cliente impactado), e a ligação mais direta com as lacunas que o ciclo proposto deve cobrir (versão de definição, lista de consumidores, POLICY-05 e POLICY-13).
 
-**Held-out (segundo item): REQUEST-007** — item ativo, mesmo domínio, exercita o ciclo prospectivamente e expõe a contradição ainda não resolvida (mart v2 + definição v3 + possible duplicate REQUEST-011).
+**Segundo item: REQUEST-007** — item ativo, mesmo domínio, expõe a contradição ainda não resolvida (mart v2 + definição v3 + possible duplicate REQUEST-011). Esta recomendação foi escrita antes de rodar o trace; o registro do que de fato aconteceu ao executá-lo está em `traces/worked-case.md` §"Trace 2 — Executed: REQUEST-007" e em `evidence/*-REQUEST-007.md`. Chamamos o item de "held-out" nesta nota original; o PR usa "second case" a partir daqui em diante, para não confundir com o material proibido do curso (`scenarios/heldout/`, `course-shared/heldout/`).

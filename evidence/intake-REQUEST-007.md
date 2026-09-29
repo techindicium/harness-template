@@ -25,6 +25,9 @@ from_team: Reporting
 requester: Lucia Ferreira
 received: 2026-08-11
 needed_by: 2026-09-04          # stated in REQUEST-007.docx: "five business days after month end"
+                                # CONTRADICTION (C16): five business days after 2026-08-31 is
+                                # 2026-09-07, not 2026-09-04. The error is in the source document.
+                                # Recorded, not corrected: the stated date is what was requested.
 summary: "Self-service per account for the August packs"   # verbatim, inbox.csv
 brief: "The same self-service number we had in July, per account, for the August packs."  # REQUEST-007.docx
 reporting_period: August 2026  # from the summary; the skill has no field for it (see findings)

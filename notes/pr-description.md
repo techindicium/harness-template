@@ -152,8 +152,8 @@ Final state: Escalated to the Analytics team. Nothing was delivered. Full trace:
 - Skill evidence artifacts are produced in the harness (`evidence/`), not in the track repository. Running the build writes `warehouse.duckdb` and `.venv/` in the track root; both are gitignored, and `git status` there stayed empty.
 - Lifecycle states, exception states, and evidence artifact names follow the patterns defined in the harness template.
 
-**New artifact introduced:**
-- `evidence/consumer-log.md`: the consumer log created at Handoff and maintained by Observe. This artifact does not exist in `portwell-analytics` today (ISSUE-30). Future modules that implement POLICY-05 enforcement will need to read from this log.
+**New artifact designed, not yet produced:**
+- `evidence/consumer-log.md`: the consumer log the `handoff` skill creates and `observe` maintains. This artifact does not exist in `portwell-analytics` today (ISSUE-30), and the executed REQUEST-007 trace does not create it either: Verify blocked the item before Approve, so it never reached Handoff (`traces/worked-case.md` §"Trace 2 — Executed"). The design is in `skills/handoff/SKILL.md`; the first real Handoff run is what will produce this file.
 
 **Dependencies on other groups/tracks:**
 - **Engineering** publishes the operational database with no written contract (`../portwell-engineering/docs/dependencies.md`). A value rename there (C7) and a missing field (`human_edit_material`) both reach this track silently.
@@ -214,5 +214,5 @@ The executable lifecycle (Module 2) would add:
 
 | Person | Contribution |
 |--------|-------------|
-| Gabriel Campos | Read and inventoried all 35+ track-repo sources; identified 6 contradictions (C1–C6) including the structurally impossible root cause in INCIDENT-03 (C6); designed the 9-stage lifecycle and 5 exception states; wrote all deliverables: `lifecycle.md` (Parts 1 and 2), 9 skill files, `traces/worked-case.md`, `notes/source-inventory.md`, `notes/findings.md`, `track.yaml`, and this PR description |
+| Gabriel Campos | Read and inventoried all 35+ track-repo sources; identified 6 contradictions (C1–C6), including the INCIDENT-03 root-cause question later narrowed in C6; designed the 9-stage lifecycle and 5 exception states; wrote all deliverables: `lifecycle.md` (Parts 1 and 2), 9 skill files, `traces/worked-case.md`, `notes/source-inventory.md`, `notes/findings.md`, `track.yaml`, and this PR description |
 | Yuri Alves | Ran the build and compared the warehouse with the figures Reporting received (C7); narrowed C6 and added C8 to C15 with the dependencies on other tracks; fixed the read-only hook and recorded the decision; restored the template keys in `track.yaml` and the template columns in `lifecycle.md`; ran REQUEST-007 through the skills and wrote `evidence/*-REQUEST-007.md`; recorded the skill gaps the run exposed |

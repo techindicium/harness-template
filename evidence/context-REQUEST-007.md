@@ -87,7 +87,7 @@ context_status: clear, with recorded deviations
 deviations:
   - extract covers August only to 2026-08-27 (simulated decision)
   - v2 instead of the current v3 (simulated decision)
-  - "closed in the period" approximated by the opening month
+  - closed in the period, approximated by the opening month
 ```
 
 Next skill: Route.

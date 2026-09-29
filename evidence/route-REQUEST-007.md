@@ -23,7 +23,7 @@ mart: project/models/marts/self_service.sql
 mart_logic: "sum(CASE WHEN p.is_self_served THEN 1 ELSE 0 END) / count(*)"
 staging_logic: "CAST(sent AS BOOLEAN) AS is_self_served"   # stg_suggestions.sql
 mart_implements_version: 2           # by rule name; field-level check belongs to Verify
-mart_definition_aligned: false against v3; the v2 rule by name
+mart_definition_aligned: false        # against v3; the v2 rule by name
 ```
 
 **Stop, version.** `mart_implements_version` is not `current_definition_version`. Message to
