@@ -85,12 +85,15 @@ contradictions_registered:
       - docs/policies.md
       - project/models/marts/self_service.sql
   - id: C6
-    summary: "INCIDENT-03 attributes figure change to v2->v3 transition; v3 was never computable (human_edit_material absent from extract)"
+    summary: "INCIDENT-03 attributes the figure change to v2->v3; change note 0088 says the mart still applies v2; the July pack shows self-service moving from 0 to 0.3478. The July extract's columns are UNKNOWN. Cause UNKNOWN."
     sources:
       - docs/incidents/INCIDENT-03.md
+      - docs/pr-notes/0088-self-service-v3.md
       - data/ops-extract/suggestion.csv
       - project/models/staging/stg_suggestions.sql
       - project/metrics/metric-definitions.yaml
+      - project/tests/self_service_rate_in_range.sql
+      - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
   - id: C7
     summary: "first_response.sql counts actor IN ('agent', 'portal'); the extract calls the portal's reply 'assist', so 296 tickets drop out and today's build does not reproduce the published attainment or p50"
     sources:
@@ -101,6 +104,23 @@ contradictions_registered:
       - ../portwell-knowledge/data/figures/warehouse-export-2026-08-06.csv
       - ../portwell-knowledge/data/figures/warehouse-export-2026-08-29.csv
       - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
+  - id: C8
+    summary: "self_service_rate v2 is account-day over tickets closed in the period; the mart is account-month over every ticket opened in the month, open ones included, and the extract has no close date"
+    sources:
+      - project/metrics/metric-definitions.yaml
+      - project/models/marts/self_service.sql
+      - data/ops-extract/ticket.csv
+  - id: C9
+    summary: "The interview says the tests check non-zero row counts and duplicate keys; none of the 6 tests does, and all 6 pass against empty tables"
+    sources:
+      - docs/interviews/2026-08-12 Declan Byrne, where the numbers come from.docx
+      - project/tests/
+  - id: C10
+    summary: "stg_extract_metadata says it records when the snapshot was taken; it records now() at build time, in local time with a Z suffix"
+    sources:
+      - project/models/staging/stg_extract_metadata.sql
+      - docs/how-we-work-today.md
+      - data/ops-extract/extract-manifest.yaml
 
 members:
   - name: Gabriel Campos

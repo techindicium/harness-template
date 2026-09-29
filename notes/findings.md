@@ -64,8 +64,23 @@ CONTRADICTION: `data/tracker.csv` (nota de ISSUE-36) diz "REQUEST-007 e REQUEST-
 **C4 — Período do extract vs. período de reporte:**
 CONTRADICTION: `data/ops-extract/extract-manifest.yaml` descreve o extract como "Covers tickets opened before 2026-08-28" (sem limite inferior); a entrevista (Declan Byrne) relata que em uma ocasião o build foi feito com o extract do mês anterior sem que ninguém percebesse antes do número parecer errado. Nenhum mecanismo no pipeline compara o período do extract com o período de reporte.
 
-**C6 — Causa-raiz de INCIDENT-03 estruturalmente impossível:**
-CONTRADICTION: `docs/incidents/INCIDENT-03.md` (2026-08-06) atribui a mudança do número de self-service à transição v2→v3 da definição em 2026-07-01; `project/models/staging/stg_suggestions.sql` computa `is_self_served = CAST(sent AS BOOLEAN)` (lógica v2 pura); `data/ops-extract/suggestion.csv` tem colunas `suggestion_id, ticket_id, created_at, article_ids, confidence, route, route_reason, sent` — o campo `human_edit_material` exigido pela definição v3 não existe no extract nem no staging model. V3 **nunca pôde ser computado** com o extract atual. A equipe investigou durante dois dias uma causa que o pipeline não tem condições de produzir. A razão real da mudança do número de Sunder Retail Supply permanece UNKNOWN.
+**C6 — Causa-raiz de INCIDENT-03: três fontes que não fecham:**
+CONTRADICTION: `docs/incidents/INCIDENT-03.md` (2026-08-06) diz que o número mudou "because the `self_service_rate` definition went from version 2 to version 3 on 2026-07-01"; `docs/pr-notes/0088-self-service-v3.md` diz "The mart was not updated. `marts/self_service.sql` still sums `is_self_served`, which is the version 2 rule", e `project/models/staging/stg_suggestions.sql` computa `is_self_served = CAST(sent AS BOOLEAN)`; o pack de julho da Sunder (`../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx`) mostra "Self-service, prior" = 0 (B19) e julho = 0.3478 (B15).
+
+Fatos medidos no extract atual: a primeira sugestão é de 2026-07-01T08:01 (`data/ops-extract/suggestion.csv`); `marts.self_service` dá 0.0 em junho para as seis contas piloto; `project/tests/self_service_rate_in_range.sql` exclui meses anteriores a 2026-07 porque "the portal was never enabled for them". O campo `human_edit_material`, exigido pela v3, não existe no extract nem no staging.
+
+Limite do que se pode afirmar: o extract no repositório é o de agosto (`taken_at: 2026-08-28T09:14:00Z`); as colunas do extract usado em julho são UNKNOWN. O que se sustenta é que o mart implementa a regra v2 (0088 e o SQL), não que a v3 fosse impossível em julho. A mudança que o cliente viu foi de 0 para 0.3478. Se ela vem da definição, da entrada do portal em julho ou de outra coisa é UNKNOWN, e a contradição fica aberta.
+
+**C8 — `self_service_rate` v2 contra o mart, campo a campo:**
+CONTRADICTION: `project/metrics/metric-definitions.yaml` v2 define grain `account-day`, numerador "tickets where proposal_sent is true" e denominador "tickets closed in the period"; `project/models/marts/self_service.sql` agrupa por `account_id, month`, soma `is_self_served` (de `suggestion.sent`) e divide por `count(*)` de todos os tickets abertos no mês, incluindo os de status `open`.
+
+Medido: o numerador é equivalente neste extract (296 `sent` verdadeiros, 296 interações `proposal_sent`). O denominador inclui os 10 tickets `open`, todos de agosto: ACCOUNT-1001 0.433 no mart contra 0.4421 só com fechados, ACCOUNT-1003 0.359 contra 0.3636, ACCOUNT-1008 0.4569 contra 0.4609. Julho não é afetado. "Closed in the period" não é computável: `ticket.csv` não tem data de fechamento, então o mart usa o mês de abertura. "Alinhado com v2" vale pelo nome da regra, não campo a campo.
+
+**C9 — O que a entrevista diz que os testes checam:**
+CONTRADICTION: Declan Byrne, na entrevista, diz que os testes checam "Row counts are not zero, no duplicate keys, percentages between zero and one"; nenhum dos 6 testes em `project/tests/` checa contagem de linhas ou chave duplicada. Medido: os 6 testes passam contra `staging` e `marts` vazios (mesmas colunas, zero linhas), porque cada teste procura linhas que violam uma regra e uma tabela vazia não tem nenhuma.
+
+**C10 — `staging.extract_metadata` não registra a idade do extract:**
+CONTRADICTION: `project/models/staging/stg_extract_metadata.sql` se descreve como "When this snapshot was taken"; `docs/how-we-work-today.md` diz que `staging.extract_metadata` registra quando o warehouse foi construído; o SQL grava `strftime(now(), '%Y-%m-%dT%H:%M:%SZ')`. Medido em 2026-09-29: um build às 15:04:50 UTC gravou `2026-09-29T12:04:50Z`, que é a hora local (-03:00) com sufixo `Z`. O manifest diz `taken_at: 2026-08-28T09:14:00Z`. Dentro do warehouse, a data do extract não existe.
 
 **C5 — POLICY-13 vs. output dos marts:**
 CONTRADICTION: `docs/policies.md` POLICY-13 exige que "toda figura em pack voltado ao cliente nomeie a definição de métrica e a versão com que foi calculada"; `project/models/marts/self_service.sql` emite `self_service_rate` sem qualquer campo de versão; `docs/policies.md` confirma: "Marts emitem números sem versão."
@@ -124,6 +139,8 @@ Source: `project/tests/*.sql`, `docs/interviews/2026-08-12 Declan Byrne...`
 - Se consumidores de métricas foram notificados sobre mudanças de definição (POLICY-05)
 - Se o número publicado cita a versão da definição usada (POLICY-13)
 - Se a query de extração usada pelo time de suporte corresponde ao schema atual
+- Se existe algum dado: os 6 testes passam contra tabelas vazias (C9)
+- Se um valor filtrado ainda existe na origem: `first_response.sql` filtra um actor que o extract não tem, e nada falha (C7)
 
 Declan Byrne, na entrevista: "Eles não verificam se um número está certo, só se é do tipo que um número deveria ser."
 
@@ -135,7 +152,7 @@ Source: `project/metrics/metric-definitions.yaml` (published_at 2026-08-20, owne
 
 | Métrica | Versão | Status | Effective from | Alinhamento com mart |
 |---------|--------|--------|---------------|----------------------|
-| `self_service_rate` | v2 | superseded | 2026-04-01 | **mart ainda implementa v2**: `is_self_served` sem filtro `human_edit_material` |
+| `self_service_rate` | v2 | superseded | 2026-04-01 | **mart ainda implementa a regra v2**: `is_self_served` sem filtro `human_edit_material`. Campo a campo há desvios de grain e de denominador (C8) |
 | `self_service_rate` | v3 | current | 2026-07-01 | **mart NÃO implementa v3**: deveria excluir edições materiais e tickets reopened em 48h |
 | `first_response_minutes_p50` | v1 | current | 2026-02-01 | **Não alinhado** (C7): mediana e minimum_denominator de 20 estão implementados, mas "first outbound interaction" filtra `actor IN ('agent', 'portal')` e o extract chama a resposta do portal de `assist`; 296 tickets ficam fora |
 | `suggestion_acceptance_rate` | v1 | current | 2026-06-15 | **Nenhum mart correspondente encontrado** |
