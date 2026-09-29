@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import sys, json; inp=json.load(sys.stdin); path=inp.get('file_path',''); sys.exit(1 if 'portwell-analytics' in path else 0)\"",
+            "onFailure": "block",
+            "blockMessage": "SPEC Rule 1: portwell-analytics is read-only. No writes or edits permitted in this repository."
+          }
+        ]
+      }
+    ]
+  }
+}

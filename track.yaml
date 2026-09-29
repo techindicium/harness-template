@@ -1,11 +1,102 @@
-# Complete this file before writing the lifecycle skills.
-group: TODO
-track: TODO # SDLC, DDLC, KDLC, or PDLC
-context_repository: TODO # Local path to the assigned Portwell track repository
-process: TODO
-work_item: TODO
+group: grupo-5
+track: DDLC
+team: Analytics
+process: "The month's figures are produced"
+managed_item: "metric or data model"
+
+context:
+  track_repo: https://github.com/techindicium/portwell-analytics
+  sources:
+    - docs/how-we-work-today.md
+    - docs/interviews/2026-08-12 Declan Byrne, where the numbers come from.docx
+    - data/tracker.csv
+    - docs/incidents/INCIDENT-01.md
+    - docs/incidents/INCIDENT-02.md
+    - docs/incidents/INCIDENT-03.md
+    - data/ops-extract/extract-manifest.yaml
+    - data/ops-extract/suggestion.csv
+    - data/ops-extract/ticket.csv
+    - data/ops-extract/account.csv
+    - data/ops-extract/tier_commitment.csv
+    - data/ops-extract/interaction.csv
+    - project/models/staging/stg_suggestions.sql
+    - project/models/staging/stg_tickets.sql
+    - project/models/staging/stg_accounts.sql
+    - project/models/staging/stg_interactions.sql
+    - project/models/staging/stg_extract_metadata.sql
+    - project/models/staging/stg_tier_commitments.sql
+    - project/models/marts/self_service.sql
+    - project/models/marts/first_response.sql
+    - project/models/marts/sla_attainment.sql
+    - project/tests/accepted_values_tier.sql
+    - project/tests/first_response_positive.sql
+    - project/tests/no_null_self-service_for_pilot.sql
+    - project/tests/not_null_self-service_account.sql
+    - project/tests/referential_ticket_account.sql
+    - project/tests/self_service_rate_in_range.sql
+    - project/metrics/metric-definitions.yaml
+    - project/run.py
+    - data/requests/inbox.csv
+    - data/requests/REQUEST-007.docx
+    - data/requests/REQUEST-011.docx
+    - data/requests/REQUEST-005.docx
+    - data/requests/REQUEST-009.docx
+    - docs/pr-notes/0088-self-service-v3.md
+    - docs/policies.md
+    - docs/identifiers.md
+  systems: UNKNOWN
+  # docs/systems.md not found in track_repo; course-shared/tools/mock-systems.json not found
+  # (separate repository not cloned). System information derived from interview and incident
+  # sources only: operational support database (extract origin), shared folder (CSV handoff),
+  # DuckDB warehouse (built by project/run.py), help portal (source of ops.suggestion table).
+  not_read:
+    - docs/data-dictionary.xlsx  # binary format, not readable
+    - course-shared/tools/mock-systems.json  # separate repository not cloned
 
 constraints:
   track_repository_access: read-only
   heldout_course_material: prohibited
 
+contradictions_registered:
+  - id: C1
+    summary: "Mart still implements self_service_rate v2; metric-definitions.yaml declares v3 current since 2026-07-01"
+    sources:
+      - project/models/marts/self_service.sql
+      - project/metrics/metric-definitions.yaml
+      - docs/pr-notes/0088-self-service-v3.md
+  - id: C2
+    summary: "docs/incidents/README.md lists only INCIDENT-01 and INCIDENT-02; INCIDENT-03.md exists in the same directory"
+    sources:
+      - docs/incidents/README.md
+      - docs/incidents/INCIDENT-03.md
+  - id: C3
+    summary: "REQUEST-007 and REQUEST-011 may be the same number; no confirmation recorded"
+    sources:
+      - data/tracker.csv
+      - data/requests/REQUEST-011.docx
+  - id: C4
+    summary: "Extract manifest has no lower coverage bound; extract period vs. reporting period is never compared in the pipeline"
+    sources:
+      - data/ops-extract/extract-manifest.yaml
+      - project/run.py
+  - id: C5
+    summary: "POLICY-13 requires version citation in packs; no mart emits a version field"
+    sources:
+      - docs/policies.md
+      - project/models/marts/self_service.sql
+  - id: C6
+    summary: "INCIDENT-03 attributes figure change to v2->v3 transition; v3 was never computable (human_edit_material absent from extract)"
+    sources:
+      - docs/incidents/INCIDENT-03.md
+      - data/ops-extract/suggestion.csv
+      - project/models/staging/stg_suggestions.sql
+      - project/metrics/metric-definitions.yaml
+
+members:
+  - name: Gabriel Campos
+    email: gabriel.campos@indicium.tech
+    role: >
+      Read and inventoried all track-repo sources; identified 6 contradictions
+      (C1–C6); designed the 9-stage lifecycle and 5 exception states; wrote
+      lifecycle.md (Parts 1 and 2), 9 skill files, traces/worked-case.md,
+      notes/source-inventory.md, and notes/findings.md.
