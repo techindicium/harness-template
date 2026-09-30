@@ -191,3 +191,10 @@ members:
       received (C7); narrowed C6 and added C8 to C15 with the cross-track
       dependencies; fixed the read-only hook; restored the template keys and
       columns; ran REQUEST-007 through the skills and recorded the evidence.
+  - name: Eric Batista
+    email: eric.batista@indicium.ai
+    role: >
+      Reviewed Module 1 deliverables against the activity guide; aligned
+      consumer-log path across lifecycle and skills; extended INCIDENT-03
+      trace with Observe→Recover (catch point 4); generalised context/verify/route
+      beyond self_service_rate-only wording.

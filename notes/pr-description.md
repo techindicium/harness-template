@@ -20,7 +20,7 @@
 - No resolution of the contradiction about what moved the Sunder Retail Supply figure (C6, C15).
 - No fix to the marts: C7 and C8 are recorded, and the executed trace escalates them to the Analytics team.
 
-**Owners:** Gabriel Campos (gabriel.campos@indicium.tech), Yuri Alves (yuri.alves@indicium.ai)
+**Owners:** Gabriel Campos (gabriel.campos@indicium.tech), Yuri Alves (yuri.alves@indicium.ai), Eric Batista (eric.batista@indicium.ai)
 
 **Acceptance criteria (from SPEC §7):**
 - `lifecycle.md` with current-process table and proposed lifecycle
@@ -207,6 +207,7 @@ The executable lifecycle (Module 2) would add:
 3. **Version citation injected at Act:** the build log currently requires the operator to manually record `definition_version_in_effect`. In Module 2, `run.py` would emit this field into the mart output directly, making POLICY-13 compliance automatic.
 4. **Consumer log as a queryable artifact:** the current consumer log is a Markdown file. Module 2 would make it a structured CSV or database table that Observe and Recover can query by metric, version, and period — enabling automated notification drafts when a definition changes.
 5. **Named approver slot enforced by the harness:** the `approve` skill currently leaves `approved_by` blank and waits. Module 2 would gate the Handoff transition on this field being non-empty, enforcing the rule mechanically rather than by instruction.
+6. **Recover exercised after a clean Handoff:** the INCIDENT-03 trace now shows that version provenance alone does not close a consumer magnitude dispute — Observe → Recover still needs a human path choice when root cause remains UNKNOWN (C6).
 
 ---
 
@@ -216,3 +217,4 @@ The executable lifecycle (Module 2) would add:
 |--------|-------------|
 | Gabriel Campos | Read and inventoried all 35+ track-repo sources; identified 6 contradictions (C1–C6), including the INCIDENT-03 root-cause question later narrowed in C6; designed the 9-stage lifecycle and 5 exception states; wrote all deliverables: `lifecycle.md` (Parts 1 and 2), 9 skill files, `traces/worked-case.md`, `notes/source-inventory.md`, `notes/findings.md`, `track.yaml`, and this PR description |
 | Yuri Alves | Ran the build and compared the warehouse with the figures Reporting received (C7); narrowed C6 and added C8 to C15 with the dependencies on other tracks; fixed the read-only hook and recorded the decision; restored the template keys in `track.yaml` and the template columns in `lifecycle.md`; ran REQUEST-007 through the skills and wrote `evidence/*-REQUEST-007.md`; recorded the skill gaps the run exposed |
+| Eric Batista | Reviewed deliverables against the Module 1 activity guide; aligned `evidence/consumer-log.md` path in `lifecycle.md` with the skills; extended the INCIDENT-03 counterfactual with Observe → Correction required → Recover (catch point 4); generalised `context` / `verify` / `route` beyond `self_service_rate`-only wording |
