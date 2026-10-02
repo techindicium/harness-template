@@ -1,11 +1,200 @@
-# Complete this file before writing the lifecycle skills.
-group: TODO
-track: TODO # SDLC, DDLC, KDLC, or PDLC
-context_repository: TODO # Local path to the assigned Portwell track repository
-process: TODO
-work_item: TODO
+group: grupo-5
+track: DDLC
+context_repository: ../portwell-analytics  # local path, relative to this repository
+team: Analytics
+process: "The month's figures are produced"
+work_item: REQUEST-007  # executed through the skills; evidence in evidence/*-REQUEST-007.md
+retrospective_case: INCIDENT-03  # counterfactual trace, not executed
+managed_item: "metric or data model"
+
+context:
+  track_repo: https://github.com/techindicium/portwell-analytics
+  sources:
+    - docs/how-we-work-today.md
+    - docs/interviews/2026-08-12 Declan Byrne, where the numbers come from.docx
+    - data/tracker.csv
+    - docs/incidents/INCIDENT-01.md
+    - docs/incidents/INCIDENT-02.md
+    - docs/incidents/INCIDENT-03.md
+    - data/ops-extract/extract-manifest.yaml
+    - data/ops-extract/suggestion.csv
+    - data/ops-extract/ticket.csv
+    - data/ops-extract/account.csv
+    - data/ops-extract/tier_commitment.csv
+    - data/ops-extract/interaction.csv
+    - project/models/staging/stg_suggestions.sql
+    - project/models/staging/stg_tickets.sql
+    - project/models/staging/stg_accounts.sql
+    - project/models/staging/stg_interactions.sql
+    - project/models/staging/stg_extract_metadata.sql
+    - project/models/staging/stg_tier_commitments.sql
+    - project/models/marts/self_service.sql
+    - project/models/marts/first_response.sql
+    - project/models/marts/sla_attainment.sql
+    - project/tests/accepted_values_tier.sql
+    - project/tests/first_response_positive.sql
+    - project/tests/no_null_self-service_for_pilot.sql
+    - project/tests/not_null_self-service_account.sql
+    - project/tests/referential_ticket_account.sql
+    - project/tests/self_service_rate_in_range.sql
+    - project/metrics/metric-definitions.yaml
+    - project/run.py
+    - data/requests/inbox.csv
+    - data/requests/REQUEST-007.docx
+    - data/requests/REQUEST-011.docx
+    - data/requests/REQUEST-005.docx
+    - data/requests/REQUEST-009.docx
+    - docs/pr-notes/0088-self-service-v3.md
+    - docs/policies.md
+    - docs/identifiers.md
+    - docs/dependencies.md
+    - docs/architecture-rules.md
+    - docs/backlog.md
+    - docs/incidents/README.md
+    - docs/data-dictionary.xlsx
+    - data/README.md
+    - project/rebuild.py
+  cross_track_sources:  # other tracks, read-only, for dependencies and published figures
+    - ../portwell-knowledge/data/figures/warehouse-export-2026-08-01.csv
+    - ../portwell-knowledge/data/figures/warehouse-export-2026-08-06.csv
+    - ../portwell-knowledge/data/figures/warehouse-export-2026-08-29.csv
+    - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
+    - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.docx
+    - ../portwell-knowledge/docs/dependencies.md
+    - ../portwell-knowledge/docs/backlog.md
+    - ../portwell-engineering/docs/dependencies.md
+    - ../portwell-engineering/docs/backlog.md
+    - ../portwell-product/docs/Policies.docx
+  systems: UNKNOWN
+  # docs/systems.md not found in track_repo; course-shared/tools/mock-systems.json not found
+  # (separate repository not cloned). System information derived from interview and incident
+  # sources only: operational support database (extract origin), shared folder (CSV handoff),
+  # DuckDB warehouse (built by project/run.py), help portal (source of ops.suggestion table).
+  not_read:
+    - course-shared/tools/mock-systems.json  # separate repository not cloned
 
 constraints:
   track_repository_access: read-only
   heldout_course_material: prohibited
 
+contradictions_registered:
+  - id: C1
+    summary: "Mart still implements self_service_rate v2; metric-definitions.yaml declares v3 current since 2026-07-01"
+    sources:
+      - project/models/marts/self_service.sql
+      - project/metrics/metric-definitions.yaml
+      - docs/pr-notes/0088-self-service-v3.md
+  - id: C2
+    summary: "docs/incidents/README.md lists only INCIDENT-01 and INCIDENT-02; INCIDENT-03.md exists in the same directory"
+    sources:
+      - docs/incidents/README.md
+      - docs/incidents/INCIDENT-03.md
+  - id: C3
+    summary: "REQUEST-007 and REQUEST-011 may be the same number; no confirmation recorded"
+    sources:
+      - data/tracker.csv
+      - data/requests/REQUEST-011.docx
+  - id: C4
+    summary: "Extract manifest has no lower coverage bound; extract period vs. reporting period is never compared in the pipeline"
+    sources:
+      - data/ops-extract/extract-manifest.yaml
+      - project/run.py
+  - id: C5
+    summary: "POLICY-13 requires version citation in packs; no mart emits a version field"
+    sources:
+      - docs/policies.md
+      - project/models/marts/self_service.sql
+  - id: C6
+    summary: "INCIDENT-03 attributes the figure change to v2->v3; change note 0088 says the mart still applies v2; the July pack shows self-service moving from 0 to 0.3478. The July extract's columns are UNKNOWN. Cause UNKNOWN."
+    sources:
+      - docs/incidents/INCIDENT-03.md
+      - docs/pr-notes/0088-self-service-v3.md
+      - data/ops-extract/suggestion.csv
+      - project/models/staging/stg_suggestions.sql
+      - project/metrics/metric-definitions.yaml
+      - project/tests/self_service_rate_in_range.sql
+      - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
+  - id: C7
+    summary: "first_response.sql counts actor IN ('agent', 'portal'); the extract calls the portal's reply 'assist', so 296 tickets drop out and today's build does not reproduce the published attainment or p50"
+    sources:
+      - project/models/marts/first_response.sql
+      - project/models/marts/sla_attainment.sql
+      - project/metrics/metric-definitions.yaml
+      - data/ops-extract/interaction.csv
+      - ../portwell-knowledge/data/figures/warehouse-export-2026-08-06.csv
+      - ../portwell-knowledge/data/figures/warehouse-export-2026-08-29.csv
+      - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
+  - id: C8
+    summary: "self_service_rate v2 is account-day over tickets closed in the period; the mart is account-month over every ticket opened in the month, open ones included, and the extract has no close date"
+    sources:
+      - project/metrics/metric-definitions.yaml
+      - project/models/marts/self_service.sql
+      - data/ops-extract/ticket.csv
+  - id: C9
+    summary: "The interview says the tests check non-zero row counts and duplicate keys; none of the 6 tests does, and all 6 pass against empty tables"
+    sources:
+      - docs/interviews/2026-08-12 Declan Byrne, where the numbers come from.docx
+      - project/tests/
+  - id: C10
+    summary: "stg_extract_metadata says it records when the snapshot was taken; it records now() at build time, in local time with a Z suffix"
+    sources:
+      - project/models/staging/stg_extract_metadata.sql
+      - docs/how-we-work-today.md
+      - data/ops-extract/extract-manifest.yaml
+  - id: C11
+    summary: "The track README describes a harness built inside the track repository and a make verify target, neither of which exists; harness-template forbids changing the track repository"
+    sources:
+      - README.md
+      - STUDENT-GUIDE.md
+      - ../harness-template/README.md
+  - id: C12
+    summary: "The data dictionary names columns and marts the models do not have (was_self-served, marts.response_times, marts.inventory_accuracy) and describes closed_tickets as closed tickets"
+    sources:
+      - docs/data-dictionary.xlsx
+      - docs/backlog.md
+      - project/models/
+  - id: C13
+    summary: "INCIDENT-03 cites ISSUE-13 in the Portal engineering backlog as the same consumer-list problem; ISSUE-13 there is 'No link between an escalation and its issue'"
+    sources:
+      - docs/incidents/INCIDENT-03.md
+      - ../portwell-engineering/docs/backlog.md
+      - ../portwell-engineering/data/tracker.csv
+  - id: C14
+    summary: "REQUEST-009 cites POLICY-11 to justify an August-only first-response median; POLICY-11, defined in the product track, covers resolution time over a trailing ninety days"
+    sources:
+      - data/requests/REQUEST-009.docx
+      - docs/policies.md
+      - ../portwell-product/docs/Policies.docx
+  - id: C15
+    summary: "INCIDENT-03 (written 2026-08-06) names TICKET-004424 as the June-to-July pack question; the ticket was opened 2026-08-20, reports a six-point drop on the dashboard, and is still open"
+    sources:
+      - docs/incidents/INCIDENT-03.md
+      - data/ops-extract/ticket.csv
+      - ../portwell-knowledge/data/packs/2026-07/ACCOUNT-1008-2026-07.xlsx
+  - id: C16
+    summary: "REQUEST-007.docx states needed_by 2026-09-04 is five business days after month end; five business days after 2026-08-31 is 2026-09-07, not 2026-09-04. 2026-09-04 is four business days out"
+    sources:
+      - data/requests/REQUEST-007.docx
+
+members:
+  - name: Gabriel Campos
+    email: gabriel.campos@indicium.tech
+    role: >
+      Read and inventoried all track-repo sources; identified 6 contradictions
+      (C1–C6); designed the 9-stage lifecycle and 5 exception states; wrote
+      lifecycle.md (Parts 1 and 2), 9 skill files, traces/worked-case.md,
+      notes/source-inventory.md, and notes/findings.md.
+  - name: Yuri Alves
+    email: yuri.alves@indicium.ai
+    role: >
+      Ran the build and compared the warehouse with the figures Reporting
+      received (C7); narrowed C6 and added C8 to C16 with the cross-track
+      dependencies; fixed the read-only hook; restored the template keys and
+      columns; ran REQUEST-007 through the skills and recorded the evidence.
+  - name: Eric Batista
+    email: eric.batista@indicium.ai
+    role: >
+      Reviewed Module 1 deliverables against the activity guide; aligned
+      consumer-log path across lifecycle and skills; extended INCIDENT-03
+      trace with Observe→Recover (catch point 4); generalised context/verify/route
+      beyond self_service_rate-only wording.
