@@ -47,11 +47,11 @@
 | `skills/handoff/SKILL.md` | Delivers as file with provenance header; refuses message delivery; creates consumer log |
 | `skills/observe/SKILL.md` | Monitors consumer citations; triggers Recover on definition changes |
 | `skills/recover/SKILL.md` | Three paths (rebuild, restatement, retirement); notifies all consumers from Observe log |
-| `traces/worked-case.md` | INCIDENT-03: 12-step counterfactual trace with 3 catch points; REQUEST-007: 7-step trace executed through the skills, ending Escalated at Verify with Approve refusing |
+| `traces/worked-case.md` | INCIDENT-03: 15-step counterfactual trace with 4 catch points; REQUEST-007: 7-step trace executed through the skills, ending Escalated at Verify with Approve refusing |
 | `evidence/*-REQUEST-007.md` | What each skill wrote when it ran: intake, context, route, build (with the full `run.py` output), verify, and the approve refusal |
 | `.claude/settings.json` | PreToolUse hook that refuses Write, Edit, MultiEdit and NotebookEdit under `portwell-analytics/` (see Decision record) |
 | `notes/source-inventory.md` | 35+ sources from `portwell-analytics`, each with date and author (or UNKNOWN) |
-| `notes/findings.md` | Described vs. practised process, divergences, 15 contradictions (C1–C15), dependencies on other tracks, the read-only hook, what the executed trace showed about the skills, tracker inconsistencies, what the 6 shape tests verify and cannot see, versioned metrics, manual handoffs, trace candidates |
+| `notes/findings.md` | Described vs. practised process, divergences, 16 contradictions (C1–C16), dependencies on other tracks, the read-only hook, what the executed trace showed about the skills, tracker inconsistencies, what the 6 shape tests verify and cannot see, versioned metrics, manual handoffs, trace candidates |
 
 ---
 
@@ -183,7 +183,7 @@ Final state: Escalated to the Analytics team. Nothing was delivered. Full trace:
 | Lifecycle is descriptive only (Module 1) | All transitions depend on human discipline. No state engine enforces them. Each "stop" in a skill is a documented instruction, not a technical block | SPEC §1 non-goals |
 
 **Contradictions registered but not resolved:**
-C1 (mart v2 vs. definition v3), C2 (incident index incomplete), C3 (REQUEST-007/011 possible duplicate), C4 (extract period not compared to reporting period in pipeline), C5 (POLICY-13 not enforced by any mart), C6 (INCIDENT-03 cause conflicts with change note 0088 and the July pack), C7 (first response drops the `assist` actor; published figures do not rebuild), C8 (v2 denominator, period and grain differ from the mart), C9 (the 6 tests pass on empty tables), C10 (extract_metadata records build time), C11 (course layer on where the harness lives), C12 (data dictionary), C13 (ISSUE-13), C14 (POLICY-11 against REQUEST-009), C15 (TICKET-004424 against INCIDENT-03). Full details: `notes/findings.md` §Contradições.
+C1 (mart v2 vs. definition v3), C2 (incident index incomplete), C3 (REQUEST-007/011 possible duplicate), C4 (extract period not compared to reporting period in pipeline), C5 (POLICY-13 not enforced by any mart), C6 (INCIDENT-03 cause conflicts with change note 0088 and the July pack), C7 (first response drops the `assist` actor; published figures do not rebuild), C8 (v2 denominator, period and grain differ from the mart), C9 (the 6 tests pass on empty tables), C10 (extract_metadata records build time), C11 (course layer on where the harness lives), C12 (data dictionary), C13 (ISSUE-13), C14 (POLICY-11 against REQUEST-009), C15 (TICKET-004424 against INCIDENT-03), C16 (REQUEST-007's `needed_by` date against its own business-day count). Full details: `notes/findings.md` §Contradições.
 
 ---
 
@@ -216,5 +216,5 @@ The executable lifecycle (Module 2) would add:
 | Person | Contribution |
 |--------|-------------|
 | Gabriel Campos | Read and inventoried all 35+ track-repo sources; identified 6 contradictions (C1–C6), including the INCIDENT-03 root-cause question later narrowed in C6; designed the 9-stage lifecycle and 5 exception states; wrote all deliverables: `lifecycle.md` (Parts 1 and 2), 9 skill files, `traces/worked-case.md`, `notes/source-inventory.md`, `notes/findings.md`, `track.yaml`, and this PR description |
-| Yuri Alves | Ran the build and compared the warehouse with the figures Reporting received (C7); narrowed C6 and added C8 to C15 with the dependencies on other tracks; fixed the read-only hook and recorded the decision; restored the template keys in `track.yaml` and the template columns in `lifecycle.md`; ran REQUEST-007 through the skills and wrote `evidence/*-REQUEST-007.md`; recorded the skill gaps the run exposed |
+| Yuri Alves | Ran the build and compared the warehouse with the figures Reporting received (C7); narrowed C6 and added C8 to C16 with the dependencies on other tracks; fixed the read-only hook and recorded the decision; restored the template keys in `track.yaml` and the template columns in `lifecycle.md`; ran REQUEST-007 through the skills and wrote `evidence/*-REQUEST-007.md`; recorded the skill gaps the run exposed |
 | Eric Batista | Reviewed deliverables against the Module 1 activity guide; aligned `evidence/consumer-log.md` path in `lifecycle.md` with the skills; extended the INCIDENT-03 counterfactual with Observe → Correction required → Recover (catch point 4); generalised `context` / `verify` / `route` beyond `self_service_rate`-only wording |

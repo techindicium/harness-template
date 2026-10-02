@@ -188,7 +188,7 @@ members:
     email: yuri.alves@indicium.ai
     role: >
       Ran the build and compared the warehouse with the figures Reporting
-      received (C7); narrowed C6 and added C8 to C15 with the cross-track
+      received (C7); narrowed C6 and added C8 to C16 with the cross-track
       dependencies; fixed the read-only hook; restored the template keys and
       columns; ran REQUEST-007 through the skills and recorded the evidence.
   - name: Eric Batista
