@@ -1,11 +1,10 @@
 # Complete this file before writing the lifecycle skills.
-group: TODO
-track: TODO # SDLC, DDLC, KDLC, or PDLC
-context_repository: TODO # Local path to the assigned Portwell track repository
-process: TODO
-work_item: TODO
+group: Grupo 3
+track: PDLC # SDLC, DDLC, KDLC, or PDLC
+context_repository: 'C:\Users\thomaz.picelli_indic\portwell-product-1' # Local path to the assigned Portwell track repository
+process: A product decision is made
+work_item: BLOCKER-01 # "POLICY-03 sign-off for LATAM accounts", data/product-tracker.xlsx row 9
 
 constraints:
   track_repository_access: read-only
   heldout_course_material: prohibited
-
