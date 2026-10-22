@@ -1,0 +1,24 @@
+{
+  "skill": "portwell-group-harness:verify",
+  "activation": {
+    "skill_names": ["portwell-group-harness:verify"],
+    "read_paths": ["skills/verify/SKILL.md"]
+  },
+  "required_reads": [
+    {"path": "skills/verify/SKILL.md"},
+    {"path": "traces/transition-log.md", "whole_file": true},
+    {"path": "lifecycle.md"},
+    {"path": "traces/worked-case.md"}
+  ],
+  "prohibited_path_names": ["SEED-MANIFEST.md"],
+  "prohibited_substrings": ["heldout"],
+  "roots": ["${project}", "${context_repository}"],
+  "read_tools": ["Read", "Grep", "Glob"],
+  "write_tools": ["Write", "Edit"],
+  "protected": [".claude/**", "scripts/hooks/**", "harness/verify-contract.json", "traces/verify-runs/**"],
+  "context_limit": 30,
+  "context_limit_note": "provisional, no measurement behind it; counts Read, Grep and Glob only",
+  "max_blocks": 3,
+  "max_denials": 3,
+  "log_check": {"path": "traces/transition-log.md", "report_block_heading": "Context read"}
+}

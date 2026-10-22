@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Skill|Read|Grep|Glob|Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,subprocess;p=os.environ['CLAUDE_PROJECT_DIR']+'/scripts/hooks/verify_contract.py';sys.exit(subprocess.call([sys.executable,p]) if os.path.exists(p) else 1)\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,subprocess;p=os.environ['CLAUDE_PROJECT_DIR']+'/scripts/hooks/verify_contract.py';sys.exit(subprocess.call([sys.executable,p]) if os.path.exists(p) else 1)\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,subprocess;p=os.environ['CLAUDE_PROJECT_DIR']+'/scripts/hooks/verify_contract.py';sys.exit(subprocess.call([sys.executable,p]) if os.path.exists(p) else 1)\""
+          }
+        ]
+      }
+    ]
+  }
+}

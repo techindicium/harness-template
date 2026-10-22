@@ -18,7 +18,7 @@ Check, against the actual sources, that every piece of evidence the transition r
 - The transition row in `lifecycle.md` (required evidence, approving role, "if the evidence is missing").
 - The Route, Act and Context evidence blocks of this run.
 - Each source a pointer cites, opened again at that file and field to confirm what it says.
-- `traces/transition-log.md`, for recorded attempts and the current state.
+- `traces/transition-log.md`, read in full (not a range), for recorded attempts and the current state.
 
 ## Prohibited context
 - Counting as evidence: a draft, a promise, a tick on the readiness checklist ("somebody believed the item was done", `data/README.md`), "Verbal confirmation from engineering" (DECISION-0028), or anything "claimed, not recorded".
@@ -34,7 +34,7 @@ Check, against the actual sources, that every piece of evidence the transition r
 4. Check active flags that block the transition. FACTS_IN_DISPUTE on a fact the transition depends on is a FAIL.
 5. Apply the explicit rules below.
 6. Apply the "If the evidence is missing" column of the transition. For T1 it says the item opens with ORIGIN_OR_DATE_UNKNOWN, so absent origin fields give PASS with that flag and nothing is filled in. For every other transition, absent evidence means FAIL. Return PASS only if every requirement is present (or T1's allowed gap) and no blocking flag is active. Otherwise FAIL, with each missing item listed and the transition refused.
-7. Append the Verify report to `traces/worked-case.md`, under "Stage evidence".
+7. Return the Verify report in the final message, starting with a `Context read` block. Do not write files during a run. A human appends the report to `traces/worked-case.md`.
 
 ### Explicit rule for T9 (IN_ANALYSIS to RESOLVED)
 T9 requires all of: (a) a documented transfer basis, (b) written approval from the policy owner of POLICY-03, (c) a recorded set of covered accounts, each with source and date. In addition the item must be in IN_ANALYSIS and FACTS_IN_DISPUTE must not be active on the wording of POLICY-03 or on the accounts.
@@ -45,7 +45,9 @@ If any of (a), (b) or (c) is absent, in conflict or not computable, Verify refus
 T5 requires the counter of recorded attempts at the limit, or the maximum days without touch exceeded, with recorded dates. The maximum is "unknown". Verify reports "not computable" and refuses T5, even though the tracker shows 60 days since the last touch (G9 to the run date). The three follow-ups are "claimed, not recorded" and do not count.
 
 ## Evidence produced
-Verify report: transition checked; table of requirements (requirement, status, pointer, note); state check; blocking flags; verdict PASS or FAIL; for FAIL, the refused transition and what is missing.
+Verify report: `Context read` block (files read; the number of data lines in `traces/transition-log.md`, written as `traces/transition-log.md (N data lines)`); transition checked; table of requirements (requirement, status, pointer, note); state check; blocking flags; verdict PASS or FAIL; for FAIL, the refused transition and what is missing.
+
+A data line is every non-blank line after the table header (the header row and its separator row) of `traces/transition-log.md`. Blank lines are not counted.
 
 ## Proposed transition
 On PASS: no state change yet. Recommend `approve`. On FAIL: recommend `recover`, and state that the transition is refused and the state is unchanged.
