@@ -1,0 +1,8 @@
+# Transition log
+
+Append-only. Written only by the `handoff` skill. The header row is the only exception. A correction is a new line, never an edit.
+
+| item | from | to | recorded_at | recorded_by | approved_by | evidence | reason | versions |
+| :- | :- | :- | :- | :- | :- | :- | :- | :- |
+| BLOCKER-01 | (start) | OPEN_UNOWNED | 2026-10-21, time unknown | handoff skill | tracker maintainer, Thomaz (Grupo 3), simulated: true. demonstration, not a real decision of Ana Fialho (tracker maintainer per the group's reading of data/product-tracker.xlsx A2) | data/product-tracker.xlsx D9, E9 (empty), F9. Verify report A5 and Approve record A6 in traces/worked-case.md | Item registered. Owner, who opened it and origin of the requirement are unknown. Flag ORIGIN_OR_DATE_UNKNOWN. | F1 owner: E9 empty versus Tomas Silva as owner of REQUEST-T01 E12, checklist C8 and POLICY-03 (Policies.docx). F3 opening date: 2026-07-11 (tracker F9, checklist E8) versus 2026-08-11 (REQUEST-T01 F12). |
+| BLOCKER-01 | (start) | OPEN_UNOWNED | 2026-10-22, time unknown | handoff skill | tracker maintainer, Thomaz (Grupo 3), simulated: true. demonstration, not a real decision of Ana Fialho (tracker maintainer per the author's reading of data/product-tracker.xlsx A2). Exact words: "Como Tracker maintainer, em demonstração, aprovo a transição T1 para o BLOCKER-01." | Log line 1. Approve record A6 (corrected) in traces/worked-case.md | Correction of line 1. Line 1 recorded the approval without the exact words of the approver. The exact words are now recorded. This line is not a second transition: the state stays OPEN_UNOWNED. | Line 1 approved_by had no exact words. Line 2 approved_by has them. All other fields of line 1 are unchanged. |
