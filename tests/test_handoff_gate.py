@@ -386,6 +386,23 @@ class TestTrace(GateCase):
         self.assertEqual(set(record["failed"]), {"approval", "verify", "period"})
         for key in ("ts", "tool", "target"):
             self.assertIn(key, record)
+        self.assertEqual(record["target"], f"evidence/{HANDOFF}")
+
+    def test_log_never_holds_the_path_of_the_machine(self):
+        proj = self.project(BLOCKED)
+        (proj / "alias.md").symlink_to(proj / "evidence" / HANDOFF)
+        for path, cwd in ((str(proj / "evidence" / HANDOFF), None), (f"../evidence/{HANDOFF}", proj / "notes"), (str(proj / "alias.md"), None)):
+            self.assertBlocked(self.write(proj, path, cwd=cwd))
+        log = (proj / "traces" / "gate-decisions.jsonl").read_text()
+        self.assertNotIn(str(proj), log)
+        self.assertEqual({json.loads(line)["target"] for line in log.splitlines()}, {f"evidence/{HANDOFF}"})
+
+    def test_target_outside_the_project_is_recorded_in_full(self):
+        proj = self.project(BLOCKED)
+        elsewhere = self.project(BLOCKED)
+        self.assertBlocked(self.write(proj, str(elsewhere / "evidence" / HANDOFF)))
+        (record,) = self.records(proj)
+        self.assertEqual(record["target"], str(elsewhere / "evidence" / HANDOFF))
 
     def test_allow_of_a_controlled_target_is_recorded(self):
         proj = self.project(CLEAN)

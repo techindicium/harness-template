@@ -337,13 +337,23 @@ def format_block(subject, item_id, failures, artifact=""):
 # --- adapter ----------------------------------------------------------------------------------
 
 
+def project_relative(path, root):
+    """How a path is written in the log: relative to the project, absolute only when outside it."""
+    root = os.path.realpath(root)
+    try:
+        inside = os.path.commonpath([path, root]) == root
+    except ValueError:
+        inside = False
+    return os.path.relpath(path, root) if inside else path
+
+
 def record(root, event, tool, target, cwd, decision, failures):
     path = os.environ.get("HANDOFF_GATE_LOG") or os.path.join(root, "traces", "gate-decisions.jsonl")
     entry = {
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "event": event,
         "tool": tool,
-        "target": os.path.realpath(os.path.join(cwd, target.raw_path)),
+        "target": project_relative(os.path.realpath(os.path.join(cwd, target.raw_path)), root),
         "item": target.item_id,
         "decision": decision,
         "failed": sorted({f["check"] for f in failures}),
