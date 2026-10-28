@@ -12,6 +12,7 @@ Deliver the approved build output to the requester as a file that includes its o
 - `evidence/approve-<REQUEST-NNN>.md` exists with `status: approved` (the `approved_by` and `approved_at` fields are filled by the named approver).
 - No block or escalation is recorded in any prior evidence file.
 - `approved_by` holds a person's name. Blank, `UNKNOWN`, a role and a placeholder do not count.
+- The handoff gate check exits 0 for the item: `handoff_gate.py check <REQUEST-NNN>`, in the repository's `scripts/hooks/` directory, run from the repository root. It reads the same evidence as the conditions above, plus the period and the build, and prints what to do when it exits 1.
 
 ## Required context
 - `evidence/approve-<REQUEST-NNN>.md` — to read `approved_by`, `approved_at`, `definition_version_in_effect`, `policy_13_citation`
@@ -25,7 +26,7 @@ Deliver the approved build output to the requester as a file that includes its o
 - Do not omit the provenance header from the delivery file (metric name, version, extract date, approver name, approval date).
 
 ## Procedure
-1. Read `evidence/approve-<REQUEST-NNN>.md`. Confirm `approved_by` holds a person's name (not blank, `UNKNOWN`, a role or a placeholder). Otherwise stop.
+1. Run the handoff gate check for the item, from the repository root. If it exits 1, stop: do not assemble the delivery, and follow the NEXT and ASK THE USER sections it prints. The same check blocks the writes of the delivery artifacts when the session loaded the project hooks; this step does not depend on that. Then read `evidence/approve-<REQUEST-NNN>.md` and confirm `approved_by` holds a person's name (not blank, `UNKNOWN`, a role or a placeholder). Otherwise stop.
 2. Assemble the delivery file `delivery/figures-<REQUEST-NNN>.csv` in the harness. This file must include, as a header comment or companion section:
    - `metric_name` and `definition_version` (from `policy_13_citation` in the approve evidence)
    - `extract_taken_at` and `extract_taken_by`
@@ -47,6 +48,7 @@ Deliver the approved build output to the requester as a file that includes its o
 - Approver was not recorded and delivery was blocked → propose **Approve** (the approval step must be completed before Handoff can proceed).
 
 ## Stop or escalation conditions
+- The handoff gate check exits 1, or a write of a delivery artifact is blocked by the gate → stop and do not deliver. Do not retry through another path and do not edit the evidence to satisfy the gate. Put the questions the gate prints to the user.
 - `approved_by` field in `evidence/approve-<REQUEST-NNN>.md` is blank or does not hold a person's name → stop and do not deliver. Notify Declan Byrne: "The approval for REQUEST-NNN has not been recorded. I will not deliver figures without a named approver on file."
 - The delivery method requested by the requester is a chat message or Slack paste → refuse and explain: "Delivery by message leaves no traceable artifact. Per the lifecycle, figures are delivered as a file. Please provide a file share path."
 
