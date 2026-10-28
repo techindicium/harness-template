@@ -13,12 +13,14 @@ and rebase merges and does not delete the head branch on merge. If #1 is squashe
 work reappears in this diff. If that happens:
 
 ```text
-gh pr edit <this PR> --base main
+gh api --method PATCH repos/techindicium/harness-template/pulls/<this PR> --field base=main
 git rebase --onto main grupo-5/module-1 feat/module-2-handoff-gate
 git push --force-with-lease
 ```
 
-The force push should be agreed first. Asking whoever merges #1 to use a merge commit avoids it.
+The retarget uses the REST API because `gh pr edit` fails on this repository with a Projects
+(classic) error. The force push should be agreed first. Asking whoever merges #1 to use a merge
+commit avoids it.
 
 ## Intended outcome
 
@@ -36,12 +38,12 @@ are a list at the top of the script and one can be dropped without changing the 
 
 ## What it checks
 
-An artifact is `handoff-<ID>.md` in an `evidence/` directory or `figures-<ID>.csv` in a `delivery/`
-directory. It is allowed only when the evidence of the same `<ID>` has:
+An artifact is a file named `handoff-<ID>.md` (kept in `evidence/`) or `figures-<ID>.csv` (kept in
+`delivery/`), in any directory. It is allowed only when the evidence of the same `<ID>` has:
 
 | Evidence | Required |
 | :- | :- |
-| `approve-<ID>.md` | `approved_by` a person's name (not empty, `UNKNOWN`, `none`, a placeholder or a role), `approved_at` an ISO date. `status` is not read: the approve skill leaves it at `awaiting_approval` and a person fills these two fields |
+| `approve-<ID>.md` | `approved_by` a person's name (not empty, `UNKNOWN`, `none`, a placeholder or a role), `approved_at` an ISO date. `status` is not read: the two Module 1 skills disagree about it (see "Known limitations") |
 | `verify-<ID>.md` | `verify_status: clear` with the three verdicts `pass`, `aligned` and `match` |
 | `context-<ID>.md` | `period_match: true` |
 | `build-<ID>.md` | `exit_code: 0` |
@@ -60,8 +62,9 @@ evidence that contradicts itself.
 | `Stop` | none | an audit of the project, in any directory: if an artifact exists for an item that is not clear, the first stop is refused and the next one is let through (loop guard) |
 
 The hook command is anchored on the project directory variable, so a change of directory cannot
-make it fail to start. That matters because a hook that fails to start exits with a code that does
-not block.
+make it fail to start. That matters because a failure to start is not a decision of the gate: a
+missing script makes `python3` exit 2, which blocks every Write, Edit and Bash call with Python's
+message, while a missing `python3` or an error in the script exits with a code that blocks nothing.
 
 ## Where it applies
 
@@ -72,16 +75,19 @@ settings documentation and was not tested in a live session. The read-only hook 
 the same limit.
 
 - To check it, run `/status` and confirm that the project settings are listed. Inside a session,
-  `/cd` to the repository root reloads them.
-- The `handoff` skill runs the same check as its first step. That step does not depend on the hooks
-  being loaded, only on the skill being followed. It was added after the live runs recorded in the
-  trace, which used the skill without it.
-- Making the gate apply in every folder needs managed settings, which is Module 3.
+  `/cd` to the repository root reloads them (Claude Code v2.1.246 or later).
+- The `handoff` skill runs the same check as its first step and stops on any non-zero exit. That
+  step does not depend on the hooks being loaded, only on the skill being followed. It was added
+  after the live runs recorded in the trace, which used the skill without it.
+- Making the gate apply in every folder needs a control outside the project settings, such as
+  managed settings, which apply wherever the session starts. The workbook places the organizational
+  control in Module 3.
 
 ## Not tied to one harness
 
 `scripts/hooks/handoff_gate.py` has three layers. The core is pure functions and does not know any
-harness. The CLI (`check <ID>`, `audit`) reads the repository and exits 0 or 1. The hook adapter
+harness. The CLI (`check <ID>`, `audit`) reads the repository and exits 0 when clear and 1 when not
+(64 on a usage error). The hook adapter
 reads one hook event and answers with the blocking exit code. Another harness, a pre-commit or a CI
 job can call the CLI without the adapter, and `audit` finds an artifact whichever tool or person
 created it. The block message is plain labeled text and names no product or model.
@@ -101,8 +107,8 @@ check; the `Stop` audit finds that artifact afterwards.
 
 Every block says what was refused, why, what was found in each evidence file, what not to do, what
 to do next, and the question to put to the user. The agent is told not to retry through another path
-and not to edit the evidence to satisfy the gate. The message for a missing approver ends with "Who
-is the named approver for <ID>?".
+and not to edit the evidence to satisfy the gate. The message for a missing approver asks "Who is
+the named approver for <ID>?", then one question for each other failed check.
 
 ## Evidence
 
@@ -133,9 +139,12 @@ the Analytics lead, whose name is UNKNOWN in the evidence.
 
 ## Inherited behavior it depends on
 
-Only exit code 2 blocks a `PreToolUse` hook. Hooks for one event run in parallel and a deny wins. A
-hook's stderr reaches the model as the tool error. The stop event carries `stop_hook_active` and the
-harness caps consecutive continuations.
+Only exit code 2 blocks a `PreToolUse` hook. Hooks for one event run in parallel and a deny wins
+over the other decisions. On a block, a hook's stderr reaches the model as the tool error, and on
+`Stop` as the reason to continue. The stop event carries `stop_hook_active`, true while the session
+is already continuing because of a stop hook, and the harness caps consecutive continuations (eight
+by default, counted again after each tool call). These come from the Claude Code hooks
+documentation.
 
 ## Known limitations
 
@@ -165,14 +174,20 @@ harness caps consecutive continuations.
 - The shell check is textual. A command that names an artifact and is not on the read-only list
   (`sed -n`, `awk`, `find`, a commit message or a heredoc body that mentions the name) is treated
   as a write and blocked while the item is not clear.
-- Only exit code 2 blocks, so a hook that cannot start or fails at import lets the action through.
-  Claude Code documents `onFailure: "block"` for command hooks from v2.1.295, which turns those
-  failures into a block on `PreToolUse` and has no effect on `Stop`. It is not set and was not
-  tested here.
+- Only exit code 2 blocks. A syntax or import error in the script (exit 1) or a missing `python3`
+  (exit 127) lets the action through. Claude Code documents `onFailure: "block"` for command hooks
+  from v2.1.295, which turns those failures into a block on `PreToolUse` and has no effect on
+  `Stop`. It is not set and was not tested here.
 - Every gated decision, `allow` included, is appended to the versioned
   `traces/gate-decisions.jsonl`. Whether the log stays versioned is not decided.
 - The approver check is a list of words. A value that is not a person and is not on the list, such
   as a job title that uses no listed word, passes.
+- The two Module 1 skills disagree about `status` in the approval evidence. The `handoff` skill
+  lists `status: approved` as an entry condition. The `approve` skill leaves the package at
+  `status: awaiting_approval` until a person fills `approved_by` and `approved_at`, and does not say
+  who changes it. The gate reads the two fields and not `status`, so on this one field it is looser
+  than the wording of the `handoff` skill. Whether to require `status: approved` as well is not
+  decided.
 
 ## Next improvement
 
