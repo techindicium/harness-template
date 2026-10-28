@@ -153,7 +153,7 @@ Fonte: o trace de INCIDENT-03 (`traces/worked-case.md`, Trace 1), lido contra o 
 
 Decisão do grupo em 2026-09-29: manter o hook de `PreToolUse` em `.claude/settings.json` e corrigi-lo, embora seja escopo do Módulo 2 ("one interception point"). Motivo: o PR já declarava esse controle, e um controle declarado que não funciona é pior do que nenhum.
 
-**Vermelho, antes da correção.** O comando lia `file_path` na raiz do payload, mas o Claude Code envia `tool_input.file_path`. Com o payload real, o comando saía com 0 e não bloqueava nada. Mesmo com o campo certo, sair com 1 não bloqueia (o bloqueio é exit 2), e `onFailure` e `blockMessage` não são campos de hook.
+**Vermelho, antes da correção.** O comando lia `file_path` na raiz do payload, mas o Claude Code envia `tool_input.file_path`. Com o payload real, o comando saía com 0 e não bloqueava nada. Mesmo com o campo certo, sair com 1 não bloqueava nas versões em uso (2.1.277 a 2.1.285), em que só o exit 2 bloqueia. O `onFailure` só é documentado a partir da v2.1.295, e o `blockMessage` não é campo de hook documentado.
 
 **Verde, depois.** O comando lê `tool_input.file_path` (e `notebook_path`), sai com 2 e explica no stderr quando o caminho está sob `/portwell-analytics/`. Testado com cinco payloads: bloqueia Write, Edit e NotebookEdit no track, e libera escrita no harness, inclusive a de um arquivo cujo nome menciona o track.
 

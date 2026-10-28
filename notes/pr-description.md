@@ -191,11 +191,13 @@ C1 (mart v2 vs. definition v3), C2 (incident index incomplete), C3 (REQUEST-007/
 ## Decision record
 
 **The read-only hook is kept, and fixed, ahead of Module 2.** The first version never blocked: it read
-`file_path` at the top of the payload instead of `tool_input.file_path`, exited 1 (only exit 2 blocks),
-and used `onFailure` and `blockMessage`, which are not hook fields. Keeping a control the PR declares,
-rather than deleting it, was the group's choice; the trade-off is building one Module 2 interception
-point early. What it still does not cover (Bash writes, sessions opened inside the track repository) is
-in `notes/findings.md` under "Controle de leitura do track (hook)".
+`file_path` at the top of the payload instead of `tool_input.file_path`, exited 1 (in the Claude Code
+versions then in use, 2.1.277 to 2.1.285, only exit 2 blocks), and used `onFailure` and
+`blockMessage`. `onFailure` is documented only from v2.1.295, and `blockMessage` is not a documented
+hook field. Keeping a control the PR declares, rather than deleting it, was the group's choice; the
+trade-off is building one Module 2 interception point early. What it still does not cover (Bash
+writes, sessions opened inside the track repository) is in `notes/findings.md` under "Controle de
+leitura do track (hook)".
 
 **The approval is the two fields, not `status`.** `handoff` listed `status: approved` as an entry
 condition, while `approve` leaves the package at `status: awaiting_approval` until a person fills
