@@ -44,7 +44,7 @@
 | `skills/act/SKILL.md` | Runs `project/run.py`; records definition version in build log |
 | `skills/verify/SKILL.md` | Distinguishes shape-test evidence from definition-alignment evidence; blocks Approve on misalignment |
 | `skills/approve/SKILL.md` | Assembles decision package only; never records approval; never infers the approver's name; hard stop until named human signs |
-| `skills/handoff/SKILL.md` | Delivers as file with provenance header; refuses message delivery; creates consumer log |
+| `skills/handoff/SKILL.md` | Delivers as file with provenance header; refuses message delivery; enters on `approved_by` and `approved_at`, not on `status`; creates consumer log |
 | `skills/observe/SKILL.md` | Monitors consumer citations; triggers Recover on definition changes |
 | `skills/recover/SKILL.md` | Three paths (rebuild, restatement, retirement); notifies all consumers from Observe log |
 | `traces/worked-case.md` | INCIDENT-03: 15-step counterfactual trace with 4 catch points; REQUEST-007: 7-step trace executed through the skills, ending Escalated at Verify with Approve refusing |
@@ -75,7 +75,7 @@ Full transition diagram: `lifecycle.md` §3c (Mermaid `stateDiagram-v2`).
 
 **Verify separates "valid" from "correct."** The 6 existing shape tests in `project/tests/` verify that numbers are of a type that a number should be (range, non-null, referential integrity). They do not check whether the mart implements the current definition, whether the extract covers the correct period, or whether the version cited in the pack matches the version computed. Verify adds three explicit checks beyond the shape tests: (1) mart logic vs. current definition, field by field; (2) extract period vs. reporting period; (3) required fields present in extract. All three must pass before the item reaches Approve. Source: Declan Byrne interview; `notes/findings.md` §"O que os 6 testes verificam."
 
-**Approve is a human-only act.** The `approve` skill assembles the decision package (number + metric name + version + period + extract date + build log + test results + definition-alignment report). It stops. A named person reviews the package and records `approved_by` and `approved_at`. The skill never writes these fields. This is the direct response to POLICY-06 (named approver for destructive transforms) and to the Approve stage's stated purpose: "the number is correct, not just valid."
+**Approve is a human-only act.** The `approve` skill assembles the decision package (number + metric name + version + period + extract date + build log + test results + definition-alignment report). It stops. A named person reviews the package and records `approved_by` and `approved_at`. The skill never writes these fields. Those two fields are the approval; `status` is a label that `handoff` does not read. This is the direct response to POLICY-06 (named approver for destructive transforms) and to the Approve stage's stated purpose: "the number is correct, not just valid."
 
 **Handoff mandates file delivery with provenance.** The `handoff` skill refuses to deliver figures as a message or paste. The delivery file includes a provenance header with metric name, version, period, extract date, and approver name. This is the enforcement point for POLICY-13, which the current pipeline does not enforce. The consumer log created at Handoff is the mechanism that makes POLICY-05 (notify consumers one period ahead of definition changes) achievable — it does not exist today (ISSUE-30 in `data/tracker.csv`).
 
@@ -196,6 +196,15 @@ and used `onFailure` and `blockMessage`, which are not hook fields. Keeping a co
 rather than deleting it, was the group's choice; the trade-off is building one Module 2 interception
 point early. What it still does not cover (Bash writes, sessions opened inside the track repository) is
 in `notes/findings.md` under "Controle de leitura do track (hook)".
+
+**The approval is the two fields, not `status`.** `handoff` listed `status: approved` as an entry
+condition, while `approve` leaves the package at `status: awaiting_approval` until a person fills
+`approved_by` and `approved_at`, and never said who changes it. `approve` also cited
+`approval_status`, a spelling that exists nowhere else. The skills now define the approval as
+`approved_by` and `approved_at`, and `status` as a label that `handoff` does not read. Step 10 of the
+INCIDENT-03 trace still writes `status: approved` at signing, which is only the label. The gap
+surfaced when the Module 2 gate was written against these skills; the correction is recorded in
+`notes/findings.md` under "Lacunas que o trace contrafactual expôs nas skills".
 
 ---
 
