@@ -22,7 +22,7 @@ Assemble the complete decision package that a named approver needs to sign off o
 - `project/metrics/metric-definitions.yaml` — to confirm the metric name and version for citation in the package
 
 ## Prohibited context
-- This skill must never write `approved_by: <name>` or `approval_status: approved` on behalf of a person.
+- This skill must never write `approved_by: <name>` or `approved_at: <datetime>` on behalf of a person.
 - Do not advance to Handoff without a recorded human approval in `evidence/approve-<REQUEST-NNN>.md`.
 - Do not deliver figures to the requester before Handoff; the build output stays within the harness until then.
 - Do not infer the approver's name. A role (`Analytics lead`), the `owner:` of a metric in `metric-definitions.yaml`, `authorised_by` in a Context decision, the `approved_by` of an earlier approval, or any name found in another record is not an approver. No source names the Analytics lead, so that name is UNKNOWN until a person records it.
@@ -34,7 +34,7 @@ Assemble the complete decision package that a named approver needs to sign off o
 3. Record in the package: metric name, version in effect, definition_alignment_verdict (from Verify), shape_tests_verdict, extract_taken_at, extract_taken_by, period_alignment_verdict, and — per POLICY-13 — the explicit statement of which definition version was used to produce the output.
 4. If POLICY-06 applies (destructive transform was used), record which operation and confirm the approver is named.
 5. Mark the package `status: awaiting_approval` and stop. Do not proceed to Handoff.
-6. The package remains at `status: awaiting_approval` until a named person explicitly records `approved_by: <name>` and `approved_at: <datetime>` in the file. This edit is made by the approver or by the skill operator on the approver's instruction — never autonomously by the skill. A name from another record (for example, the original approver re-approving a restatement) is eligible only after a named person writes `designated_approver`, `designated_by` and `designated_at` in the package. `designated_by` follows the same rule as `approved_by`. The skill never writes or copies a name into these fields, and `approved_by` and `approved_at` are still written by the approver.
+6. The package remains at `status: awaiting_approval` until a named person explicitly records `approved_by: <name>` and `approved_at: <datetime>` in the file. Those two fields are the approval: `status` is a label that Handoff does not read. This edit is made by the approver or by the skill operator on the approver's instruction — never autonomously by the skill. A name from another record (for example, the original approver re-approving a restatement) is eligible only after a named person writes `designated_approver`, `designated_by` and `designated_at` in the package. `designated_by` follows the same rule as `approved_by`. The skill never writes or copies a name into these fields, and `approved_by` and `approved_at` are still written by the approver.
 
 ## Evidence produced
 - `evidence/approve-<REQUEST-NNN>.md` in the harness, containing:

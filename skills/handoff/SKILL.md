@@ -9,7 +9,7 @@ description: Delivers the approved figures as a file artifact (never as a messag
 Deliver the approved build output to the requester as a file that includes its own provenance, and register every consumer in the consumer log so that definition changes and restatements can reach them.
 
 ## Entry conditions
-- `evidence/approve-<REQUEST-NNN>.md` exists with `status: approved` (the `approved_by` and `approved_at` fields are filled by the named approver).
+- `evidence/approve-<REQUEST-NNN>.md` exists with `approved_by` and `approved_at` filled by the named approver. `status` is a label and is not an entry condition.
 - No block or escalation is recorded in any prior evidence file.
 - `approved_by` holds a person's name. Blank, `UNKNOWN`, a role and a placeholder do not count.
 
