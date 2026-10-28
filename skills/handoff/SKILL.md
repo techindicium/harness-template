@@ -9,7 +9,7 @@ description: Delivers the approved figures as a file artifact (never as a messag
 Deliver the approved build output to the requester as a file that includes its own provenance, and register every consumer in the consumer log so that definition changes and restatements can reach them.
 
 ## Entry conditions
-- `evidence/approve-<REQUEST-NNN>.md` exists with `status: approved` (the `approved_by` and `approved_at` fields are filled by the named approver).
+- `evidence/approve-<REQUEST-NNN>.md` exists with `approved_by` and `approved_at` filled by the named approver. `status` is a label and is not an entry condition.
 - No block or escalation is recorded in any prior evidence file.
 - `approved_by` holds a person's name. Blank, `UNKNOWN`, a role and a placeholder do not count.
 - The handoff gate check exits 0 for the item: `python3 scripts/hooks/handoff_gate.py check <REQUEST-NNN>`, run from the repository root. It reads the same evidence as the conditions above, plus the period and the build, and prints what to do when it exits 1. Any other non-zero exit means the check did not run: treat the item as not clear.
