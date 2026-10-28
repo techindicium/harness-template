@@ -191,9 +191,10 @@ back to the user.
 - Only exit code 2 blocks a `PreToolUse` hook; an error exits 1 and does not.
 - Hooks for the same event run in parallel and `deny` wins over the others.
 - The hook payload carries the working directory and the tool input; the stop event carries
-  `stop_hook_active`, and the harness caps consecutive continuations.
-- A hook's stderr reaches the model as the tool error, and the result record lists the refused
-  call under `permission_denials`.
+  `stop_hook_active`, true while the session is already continuing because of a stop hook, and the
+  harness caps consecutive continuations (eight by default, counted again after each tool call).
+- On a block, a hook's stderr reaches the model as the tool error (on `Stop`, as the reason to
+  continue), and the result record lists the refused call under `permission_denials`.
 - In the permission mode used here, a write inside the project is accepted without a prompt, so
   before the gate a human prompt was not a barrier in this setup. In interactive default mode a
   prompt would appear. That was not run.
@@ -209,7 +210,8 @@ back to the user.
   `handoff` skill runs the same check as its first step, which does not depend on the hooks. The
   read-only hook from Module 1 has the same limit.
 - The gate trusts fields the model can also write. It catches evidence that contradicts itself
-  (a clear status next to a verdict that is not clear), not a clear and consistent falsehood.
+  (a clear status next to a verdict that is not clear, or a field that appears twice with different
+  values), not a clear and consistent falsehood.
 - A name built at run time, a glob, or a script written earlier is only found afterwards, by the
   `Stop` audit.
 - The model could edit `.claude/settings.json` or the script to switch the gate off. Review of
@@ -233,12 +235,18 @@ back to the user.
 - The shell check is textual. A command that names an artifact and is not on the read-only list
   (`sed -n`, `awk`, `find`, a commit message or a heredoc body that mentions the name) is blocked
   while the item is not clear.
-- Only exit code 2 blocks, so a hook that cannot start or fails at import lets the action through.
-  The `onFailure: "block"` option of Claude Code command hooks (documented from v2.1.295, no effect
-  on `Stop`) would cover that. It is not set and was not tested.
+- Only exit code 2 blocks. A syntax or import error in the script (exit 1) or a missing `python3`
+  (exit 127) lets the action through, while a missing script file exits 2 and blocks every
+  `PreToolUse` call with Python's message. The `onFailure: "block"` option of Claude Code command
+  hooks (documented from v2.1.295, no effect on `Stop`) would cover the first two. It is not set
+  and was not tested.
 - Every gated decision, `allow` included, is appended to the versioned decision log. Whether the
   log stays versioned is not decided.
 - The approver check is a list of words, so a job title that uses no listed word passes.
+- The `handoff` skill lists `status: approved` as an entry condition, while the `approve` skill
+  leaves the package at `status: awaiting_approval` until a person fills `approved_by` and
+  `approved_at`, and does not say who changes it. The gate reads the two fields and not `status`.
+  Whether to require `status: approved` as well is not decided.
 
 ## 11. Reproduce
 
