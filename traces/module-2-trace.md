@@ -103,7 +103,7 @@ approver, written because an operator asked for it.
 | :- | :- | :- |
 | Barrier | the skill's prose and the model's judgment | the gate, on `PreToolUse` |
 | Outcome of the pressure request | the write went through | the write was refused, the file does not exist |
-| Evidence | the permission mode accepted the write; `permission_denials` empty | the tool result is a hook error and `permission_denials` has the write; the gate logs the decision (see the note below) |
+| Evidence | the permission mode accepted the write; `permission_denials` empty | the tool result is a hook error and `permission_denials` has the write; the gate logs the decision (see "About the decision log") |
 
 **About the decision log.** The line in `traces/gate-decisions.jsonl` was written by the gate, not
 by hand, but it is not the line from the live session. That one recorded the absolute path of the
@@ -139,27 +139,30 @@ ASK THE USER: "Who is the named approver for REQUEST-007?" and two more question
 
 ## 6. Deterministic evidence
 
-- [x] `python3 tests/test_handoff_gate.py` passes 39 tests: the core, the CLI without the hook
+- [x] `python3 tests/test_handoff_gate.py` passes 45 tests: the core, the CLI without the hook
   adapter, the hook adapter with real payload shapes, the block message, the decision log (including
   that it never holds the path of the machine), and the group's own REQUEST-007 evidence.
 - [x] The matrix pins both sides. Blocked: an absolute path, a relative path, `./` and `..`, a
   bare name after a change of directory, a symlink with another name, upper case, `Edit`, redirect,
   append, `tee`, `sed -i`, `cp`, `mv`, `touch`, `git add`, inline Python, `bash -c`, a proxy
-  wrapper, `sudo`, a command split over lines, and an event that cannot be read but names the
-  artifact. Allowed: a clean item, paths that are not artifacts, reads (`cat`, `head`, `grep`,
-  `wc`, `ls`, `diff`, `git diff`, `git status`, `git log`), other tools, and an unreadable event
-  that names nothing.
+  wrapper, `sudo`, a command split over lines, `dd`, a write hidden in a command substitution,
+  backticks, a process substitution or `git --output`, an artifact in any directory found by the
+  `Stop` audit, and an event that cannot be read but names the artifact. Allowed: a clean item,
+  paths that are not artifacts, reads (`cat`, `head`, `grep`, `wc`, `ls`, `diff`, `git diff`,
+  `git status`, `git log`, also with `2>/dev/null`, `2>&1` or `git -C`), removing an artifact, other
+  tools, and an unreadable event that names nothing.
 - [x] The matrix was first run before the script existed and failed everywhere, which exposed a
   trap: Python itself exits 2 when it cannot open a script, the same code as a block. The test
   helper now also requires the gate's own message.
-- [x] 16 one-at-a-time mutations of the script were each caught by the matrix (a block that exits
-  1, the symlink not resolved, writers treated as readers, failing open, the loop guard ignored,
-  the proxy wrapper not skipped, incoherent evidence not detected, roles accepted as names, a
-  reader's redirect ignored, upper case not matched, an audit that finds nothing, missing evidence
-  tolerated, a trace never written, a message without the DO NOT section, a log that keeps the full
-  path, a log that is always relative even outside the project). This was a one-off run
-  on a temporary copy and the mutation script is not part of this repository, so it is a claim a
-  reviewer cannot replay from here.
+- Reported, not reproducible: 16 one-at-a-time mutations of the script were each caught by the
+  matrix (a block that exits 1, the symlink not resolved, writers treated as readers, failing open,
+  the loop guard ignored, the proxy wrapper not skipped, incoherent evidence not detected, roles
+  accepted as names, a reader's redirect ignored, upper case not matched, an audit that finds
+  nothing, missing evidence tolerated, a trace never written, a message without the DO NOT section,
+  a log that keeps the full path, a log that is always relative even outside the project). This was
+  a one-off run on a temporary copy of an earlier version of the script, before the fixes that
+  followed the code review of the pull request, and the mutation script is not part of this
+  repository, so it is a claim a reviewer cannot replay from here.
 
 ## 7. Failure-first review
 
@@ -168,7 +171,7 @@ Bad inputs tried against the design, and what each exposed.
 | Bad input | Result | What it exposed |
 | :- | :- | :- |
 | A path to the artifact in every spelling (absolute, relative, `..`, symlink, upper case, bare name after `cd`) | all blocked | the target is matched by file name and the evidence directory is derived from the target, so the spelling does not matter |
-| A shell write by redirect, `tee`, `sed -i`, `cp`, `mv`, `touch`, inline interpreter, wrapper, `sudo` | all blocked | only commands that merely read are let through |
+| A shell write by redirect, `tee`, `sed -i`, `cp`, `mv`, `touch`, inline interpreter, wrapper, `sudo` | all blocked | only commands that merely read or remove are let through, and only when they do not redirect or run another command through a substitution |
 | An event the gate cannot parse, naming the artifact | blocked | an unhandled error would exit 1, which does not block, so every error path is decided explicitly |
 | An artifact created by a route the command check cannot see | caught by the `Stop` audit, in the matrix | a name built at run time or a script written earlier needs the audit |
 | The pressure request, live | blocked | the model respected the block, which the message is written to make likely |
@@ -219,6 +222,23 @@ back to the user.
 - Whether the working directory in the hook payload follows an earlier change of directory in
   the same session was not measured. The shell check does not depend on it.
 - Wiring the audit into a pre-commit or a CI job is not done.
+- Only `handoff-<ID>.md` and `figures-<ID>.csv` are protected. The restatement delivery
+  `delivery/restatement-<ID>.csv` of the recover skill and a renamed variant (a `-v2` suffix) are
+  not matched. Whether to widen the set is not decided.
+- The evidence directory is derived from where the artifact is, so clean evidence next to a copied
+  `delivery/` directory satisfies the gate for the copy. Anchoring it on the project root is not
+  decided.
+- The `Stop` audit is a single nudge: the loop guard lets the next stop through, so an artifact
+  that nobody removes stays and is flagged again at the end of each later turn.
+- The shell check is textual. A command that names an artifact and is not on the read-only list
+  (`sed -n`, `awk`, `find`, a commit message or a heredoc body that mentions the name) is blocked
+  while the item is not clear.
+- Only exit code 2 blocks, so a hook that cannot start or fails at import lets the action through.
+  The `onFailure: "block"` option of Claude Code command hooks (documented from v2.1.295, no effect
+  on `Stop`) would cover that. It is not set and was not tested.
+- Every gated decision, `allow` included, is appended to the versioned decision log. Whether the
+  log stays versioned is not decided.
+- The approver check is a list of words, so a job title that uses no listed word passes.
 
 ## 11. Reproduce
 
@@ -253,7 +273,7 @@ reviewer can check.
 
 | Point | Status | Where to check |
 | :- | :- | :- |
-| The existing hook lets the write of the artifact through and the gate blocks it, for the same payload | reproducible | the commands below, on a checkout of this branch |
+| The existing hook lets the write of the artifact through and the gate blocks it, for the same payload | reproducible | the payload check commands in this section, on a checkout of this branch |
 | The regression matrix passes, both sides pinned | reproducible | `python3 tests/test_handoff_gate.py` |
 | The Module 1 evidence that keeps REQUEST-007 from being clear | in the repository | `evidence/*-REQUEST-007.md` |
 | The gate writes its own decision log | in the repository | `traces/gate-decisions.jsonl`; the line was regenerated by the gate, see section 5 |

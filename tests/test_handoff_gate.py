@@ -20,6 +20,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+sys.dont_write_bytecode = True  # load_gate() reads the script from source; leave no __pycache__ beside it
+
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = REPO / "scripts" / "hooks" / "handoff_gate.py"
 ITEM = "REQUEST-007"
@@ -125,6 +127,7 @@ class TestCore(GateCase):
         not_names = [
             "", "UNKNOWN", "unknown", "none", "null", "TBD", "N/A", "Analytics lead", "the owner",
             "<name>", "[name UNKNOWN]", "UNKNOWN (Analytics lead)", "approver", "12345", "pending",
+            "agent", "the user", "Automation bot", "nobody",
         ]
         for value in names:
             with self.subTest(value=value):
@@ -163,6 +166,37 @@ class TestCore(GateCase):
                 proj = self.project(evidence)
                 failures = self.gate.check_item(proj / "evidence", ITEM)
                 self.assertEqual(failures == [], ok)
+
+    def test_approval_is_read_from_the_two_fields_a_person_fills(self):
+        # The approve skill leaves `status: awaiting_approval`; the approver fills the two fields.
+        evidence = dict(CLEAN)
+        evidence[f"approve-{ITEM}.md"] = "status: awaiting_approval\napproved_by: Maria Silva\napproved_at: 2026-10-01 10:00\n"
+        proj = self.project(evidence)
+        self.assertEqual(self.gate.check_item(proj / "evidence", ITEM), [])
+
+    def test_approved_at_must_be_a_date(self):
+        for value, ok in [
+            ("2026-10-01", True), ("2026-10-01T10:00:00", True), ("2026-10-01 10:00", True),
+            ("pending", False), ("todo", False), ("yesterday", False), ("2026-13-45", False), ("", False),
+        ]:
+            with self.subTest(value=value):
+                evidence = dict(CLEAN)
+                evidence[f"approve-{ITEM}.md"] = f"status: approved\napproved_by: Maria Silva\napproved_at: {value}\n"
+                proj = self.project(evidence)
+                self.assertEqual(self.gate.check_item(proj / "evidence", ITEM) == [], ok)
+
+    def test_a_field_with_two_different_values_is_not_clear(self):
+        # A later line that repeats a key (an example, a quotation) must not decide the record.
+        verify = CLEAN[f"verify-{ITEM}.md"]
+        for label, extra, ok in [
+            ("same value twice", "verify_status: clear\n", True),
+            ("another value later", "\nExample of a blocked record:\nverify_status: blocked\n", False),
+        ]:
+            with self.subTest(label):
+                evidence = dict(CLEAN)
+                evidence[f"verify-{ITEM}.md"] = verify + extra
+                proj = self.project(evidence)
+                self.assertEqual(self.gate.check_item(proj / "evidence", ITEM) == [], ok)
 
     def test_targets_in_text(self):
         found = self.gate.find_targets(f"cd evidence && echo x > ../evidence/{HANDOFF}")
@@ -218,6 +252,13 @@ class TestBypassIsBlocked(GateCase):
             ("git add", f"git add evidence/{HANDOFF}"),
             ("delivery csv", f"echo x > delivery/{FIGURES}"),
             ("chained after a read", f"ls evidence && echo x > evidence/{HANDOFF}"),
+            ("dd", f"echo x | dd of=evidence/{HANDOFF}"),
+            ("both streams to the artifact", f"echo x &> evidence/{HANDOFF}"),
+            ("command substitution in a reader", f"echo $(cp /tmp/x.md evidence/{HANDOFF})"),
+            ("substitution inside double quotes", f'echo "$(cp /tmp/x.md evidence/{HANDOFF})"'),
+            ("backticks in a reader", f"echo `cp /tmp/x.md evidence/{HANDOFF}`"),
+            ("process substitution in a reader", f"diff <(cp /tmp/x.md evidence/{HANDOFF}) /dev/null"),
+            ("git output option", f"git diff --output=evidence/{HANDOFF} HEAD"),
         ]
         for label, command in cases:
             with self.subTest(label):
@@ -235,6 +276,14 @@ class TestBypassIsBlocked(GateCase):
     def test_stop_audit_catches_what_the_shell_parser_cannot_see(self):
         (self.proj / "evidence" / HANDOFF).write_text("written by a script, name built at run time\n")
         self.assertBlocked(self.stop(self.proj))
+
+    def test_stop_audit_finds_an_artifact_in_any_directory(self):
+        # The hook protects the names at any depth, so the audit has to look for them there too.
+        for rel in (f"notes/{HANDOFF}", FIGURES, f"evidence/{FIGURES}", f"delivery/{HANDOFF}"):
+            with self.subTest(rel):
+                proj = self.project(BLOCKED)
+                (proj / rel).write_text("x\n")
+                self.assertBlocked(self.stop(proj))
 
 
 class TestHonestUseIsNotBlocked(GateCase):
@@ -264,7 +313,21 @@ class TestHonestUseIsNotBlocked(GateCase):
             f"rtk proxy 'cat evidence/{HANDOFF}'",
             "echo handoff and figures",
             f"cat evidence/approve-{ITEM}.md",
+            f"cat evidence/{HANDOFF} 2>/dev/null",
+            f"grep -n x evidence/{HANDOFF} 2>&1",
+            f"grep -n x evidence/{HANDOFF} 2>&1 | head -3",
+            f"git -C . diff -- evidence/{HANDOFF}",
+            f"git --no-pager log --oneline -- evidence/{HANDOFF}",
+            f"grep '>' evidence/{HANDOFF}",
+            f"git log --format='%an <%ae>' -- evidence/{HANDOFF}",
         ):
+            with self.subTest(command):
+                self.assertPasses(self.bash(proj, command))
+
+    def test_removing_an_artifact_is_allowed_even_when_not_cleared(self):
+        # The block message offers removal as a way out, so the gate must not stand in its way.
+        proj = self.project(BLOCKED)
+        for command in (f"rm evidence/{HANDOFF}", f"rm -f delivery/{FIGURES}", f"git rm -f evidence/{HANDOFF}"):
             with self.subTest(command):
                 self.assertPasses(self.bash(proj, command))
 
@@ -414,6 +477,12 @@ class TestTrace(GateCase):
         proj = self.project(BLOCKED)
         self.assertPasses(self.write(proj, str(proj / "notes" / "foo.md")))
         self.assertEqual(self.records(proj), [])
+
+    def test_relative_log_location_is_resolved_not_dropped(self):
+        proj = self.project(BLOCKED)
+        payload = {"cwd": str(proj), "hook_event_name": "PreToolUse", "tool_name": "Write", "tool_input": {"file_path": str(proj / "evidence" / HANDOFF)}}
+        self.run_gate(proj, ["hook"], stdin=json.dumps(payload), env_extra={"HANDOFF_GATE_LOG": "relative.jsonl"})
+        self.assertTrue((proj / "relative.jsonl").exists())
 
     def test_log_location_can_be_overridden(self):
         proj = self.project(BLOCKED)

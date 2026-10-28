@@ -4,10 +4,11 @@
 One decision, enforced where the artifact is written. The Handoff entry conditions used to exist
 only as prose in a skill; this turns them into a check that runs on the execution path.
 
-An artifact is `handoff-<ID>.md` (in an `evidence/` directory) or `figures-<ID>.csv` (in a
-`delivery/` directory), with `<ID>` such as REQUEST-007. It is allowed only when the evidence
-files of the same item, in `evidence/`, say the item is clear (see CONTRACT below). A missing
-file, a missing field and an unreadable file all count as "not clear".
+An artifact is a file named `handoff-<ID>.md` (kept in `evidence/`) or `figures-<ID>.csv` (kept
+in `delivery/`), at any depth, with `<ID>` such as REQUEST-007. It is allowed only when the
+evidence files of the same item, in `evidence/`, say the item is clear (see CONTRACT). A missing
+file, a missing field, an unreadable file and a field that appears twice with different values
+all count as "not clear".
 
 Three layers, so the control does not depend on any one harness or model:
 
@@ -22,11 +23,12 @@ reads the repository state, so it finds an artifact whichever tool or person cre
 The target is matched by file name, at any depth and in any spelling of the path, and the
 evidence directory is derived from the target, so a relative path, an absolute path, `..`, a
 symlink, upper case or a `cd` before the write all reach the same decision. A shell command is
-split on unquoted operators; a segment is let through only when its command only reads. Anything
-else that names an artifact is judged by the evidence. A name built at run time (a variable, a
-glob, a script written earlier) is not visible to a command check: `audit` finds that artifact
-afterwards. The gate fails closed: when it cannot read the event but the raw text names an
-artifact, it blocks.
+split on unquoted operators; a segment is let through only when its command only reads (no
+redirect, no command substitution, no output option) or only removes, so a stray artifact can be
+cleaned up. Anything else that names an artifact is judged by the evidence. A name built at run
+time (a variable, a glob, a script written earlier) is not visible to a command check: `audit`
+finds that artifact afterwards. The gate fails closed: when it cannot read the event but the raw
+text names an artifact, it blocks.
 
 Exit codes of `hook`: 2 blocks, 0 passes. Only 2 blocks; an unhandled error would exit 1, which
 does not, so every error path in `hook` is handled and decided explicitly.
@@ -44,10 +46,12 @@ from collections import namedtuple
 from datetime import datetime, timezone
 
 # Stage -> (check key, required fields). A value is compared without case; "@person" and
-# "@filled" are the two checks that are not an equality. The check key selects the wording of
-# the block message. Change the fields here to move the gate to another process.
+# "@date" are the two checks that are not an equality. The check key selects the wording of
+# the block message. Change the fields here to move the gate to another process. Approval is read
+# from the two fields a person fills, not from `status`: the approve skill leaves its package at
+# `status: awaiting_approval` and nobody is told to change it.
 CONTRACT = (
-    ("approve", "approval", (("status", "approved"), ("approved_by", "@person"), ("approved_at", "@filled"))),
+    ("approve", "approval", (("approved_by", "@person"), ("approved_at", "@date"))),
     (
         "verify",
         "verify",
@@ -63,17 +67,29 @@ CONTRACT = (
 )
 
 # Words that mean the value is not a person: a placeholder, or a role instead of a name.
-NOT_A_PERSON = {"unknown", "none", "null", "tbd", "pending", "todo", "placeholder"}
-ROLE_WORDS = {"lead", "owner", "manager", "approver", "team"}
+NOT_A_PERSON = {"unknown", "none", "null", "tbd", "pending", "todo", "placeholder", "nobody", "unassigned"}
+ROLE_WORDS = {"lead", "owner", "manager", "approver", "team", "agent", "assistant", "automation", "bot", "model", "system", "user"}
 EMPTY_VALUES = {"", "none", "null", "unknown", "tbd", "n/a", "na", "-"}
+# What a field holds when the same key appears twice with different values.
+CONFLICT = "more than one value"
 
-# Commands that only read. With a `>` in the same segment they are treated as writers.
+# Commands that only read. A segment that also redirects, substitutes a command or names an
+# output file is treated as a writer (see may_write).
 READ_ONLY = {
     "cat", "head", "tail", "less", "more", "grep", "egrep", "fgrep", "rg", "wc", "ls", "stat", "file",
     "diff", "cmp", "md5sum", "sha1sum", "sha256sum", "echo", "printf", "test", "[", "realpath",
     "basename", "dirname", "readlink",
 }
 GIT_READ_ONLY = {"status", "diff", "log", "show", "ls-files", "blame", "grep"}
+# Commands that only remove. Removing an artifact is how a stray one is cleaned up, so it passes.
+REMOVERS = {"rm", "unlink"}
+GIT_REMOVERS = {"rm"}
+# Global git options that take the next word as their value, as in `git -C <dir> diff`.
+GIT_OPTIONS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
+# Redirects that write nothing: a stream copied to another, or anything sent to /dev/null.
+SAFE_REDIRECT = re.compile(r"&?\d*>&\d+|&?\d*>>?\s*/dev/null(?![\w./-])")
+QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+SINGLE_QUOTED = re.compile(r"'[^']*'")
 # Words that run another command; they are skipped to find the command that matters.
 WRAPPERS = {"sudo", "env", "rtk", "proxy", "time", "timeout", "nice", "nohup", "command", "exec", "xargs", "stdbuf"}
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__"}
@@ -134,22 +150,34 @@ def is_person(value):
     return bool(words) and not words & (NOT_A_PERSON | ROLE_WORDS)
 
 
+def is_date(value):
+    """An ISO date, alone or followed by a time. A placeholder or an impossible date is not one."""
+    if not re.match(r"\d{4}-\d{2}-\d{2}(?:[T ].*)?$", value):
+        return False
+    try:
+        datetime.strptime(value[:10], "%Y-%m-%d")
+    except ValueError:
+        return False
+    return True
+
+
 def satisfies(value, expected):
-    if value is None:
+    if value is None or value == CONFLICT:
         return False
     if expected == "@person":
         return is_person(value)
-    if expected == "@filled":
-        return value.casefold() not in EMPTY_VALUES and not re.fullmatch(r"[<\[].*[>\]]", value)
+    if expected == "@date":
+        return is_date(value)
     return value.casefold() == expected
 
 
 def describe(expected):
-    return {"@person": "a person's name", "@filled": "a value"}.get(expected, expected)
+    return {"@person": "a person's name", "@date": "a date"}.get(expected, expected)
 
 
 def read_fields(path):
-    """`key: value` lines of an evidence file, the last one winning; None when unreadable."""
+    """`key: value` lines of an evidence file; None when unreadable. A key that appears twice
+    with different values holds CONFLICT, because there is no telling which line is the record."""
     try:
         with open(path, encoding="utf-8", errors="replace") as handle:
             lines = handle.read().splitlines()
@@ -159,7 +187,9 @@ def read_fields(path):
     for line in lines:
         match = FIELD.match(line)
         if match:
-            fields[match.group(1)] = re.sub(r"\s+#.*$", "", match.group(2)).strip().strip("\"'`")
+            key = match.group(1)
+            value = re.sub(r"\s+#.*$", "", match.group(2)).strip().strip("\"'`")
+            fields[key] = value if fields.get(key, value) == value else CONFLICT
     return fields
 
 
@@ -227,6 +257,8 @@ def segments(command):
         elif char in "'\"":
             quote = char
             buf.append(char)
+        elif char == "&" and (command[i - 1:i] == ">" or command[i + 1:i + 2] == ">"):
+            buf.append(char)  # `2>&1` and `&>` redirect; they do not end the command
         elif char in ";&|\n":
             out.append("".join(buf))
             buf = []
@@ -237,8 +269,28 @@ def segments(command):
     return [part.strip() for part in out if part.strip()]
 
 
+def git_subcommand(words):
+    """The git subcommand, after global options such as `-C <dir>`, `-c k=v` and `--no-pager`."""
+    rest = iter(words[1:])
+    for word in rest:
+        if word in GIT_OPTIONS_WITH_VALUE:
+            next(rest, None)
+        elif not word.startswith("-"):
+            return word
+    return ""
+
+
+def may_write(segment):
+    """A read-only or removing command can still write: it redirects, runs another command through
+    a substitution, or names an output file. Quoted text is literal, except that a substitution
+    still runs inside double quotes."""
+    plain = QUOTED.sub("", SAFE_REDIRECT.sub("", segment))
+    live = SINGLE_QUOTED.sub("", segment)
+    return ">" in plain or "--output" in plain or any(mark in live for mark in ("$(", "`", "<("))
+
+
 def writing_segments(command, depth=0):
-    """Segments that name an artifact and may write it; reads are let through."""
+    """Segments that name an artifact and may write it; reads and removals are let through."""
     risky = []
     for segment in segments(command):
         if not ARTIFACT.search(segment):
@@ -253,8 +305,9 @@ def writing_segments(command, depth=0):
             risky += writing_segments(words[0], depth + 1)
             continue
         command_word = os.path.basename(words[0]) if words else ""
-        reads = command_word in READ_ONLY or (command_word == "git" and len(words) > 1 and words[1] in GIT_READ_ONLY)
-        if reads and ">" not in segment:
+        subcommand = git_subcommand(words) if command_word == "git" else ""
+        harmless = command_word in READ_ONLY or command_word in REMOVERS or subcommand in GIT_READ_ONLY | GIT_REMOVERS
+        if harmless and not may_write(segment):
             continue
         risky.append(segment)
     return risky
@@ -296,14 +349,13 @@ def evidence_dir(target, cwd, root):
 
 
 def audit(root):
-    """Artifacts that exist in the tree although their item does not pass."""
+    """Artifacts that exist in the tree, in any directory, although their item does not pass."""
     violations = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
-        parent = os.path.basename(dirpath).casefold()
         for filename in filenames:
             match = ARTIFACT_NAME.fullmatch(filename)
-            if not match or (match.group("hid") and parent != "evidence") or (match.group("fid") and parent != "delivery"):
+            if not match:
                 continue
             target = Target(filename, match.group("hid") or match.group("fid"), os.path.join(dirpath, filename))
             failures = check_item(evidence_dir(target, dirpath, root), target.item_id)
@@ -348,7 +400,7 @@ def project_relative(path, root):
 
 
 def record(root, event, tool, target, cwd, decision, failures):
-    path = os.environ.get("HANDOFF_GATE_LOG") or os.path.join(root, "traces", "gate-decisions.jsonl")
+    path = os.path.abspath(os.environ.get("HANDOFF_GATE_LOG") or os.path.join(root, "traces", "gate-decisions.jsonl"))
     entry = {
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "event": event,
