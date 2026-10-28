@@ -97,7 +97,7 @@ As colunas que o template pede e que a tabela 3a não mostra. Cada linha resume 
 | Act | Route `standard_build`; mart alinhado ou desvio aprovado; período confirmado | Verify; Correction required | POLICY-06 se aplica e não há aprovador nomeado |
 | Verify | Build com `exit_code: 0` e linhas no resultado | Approve; Correction required; Escalated | Os testes passam, mas a definição não bate; a correção exige mudar o track |
 | Approve | Verify `clear` nos três vereditos | Handoff; Correction required; Escalated | Falta evidência ou há bloqueio; há desalinhamento de definição; não há aprovador nomeado |
-| Handoff | `approved_by` e `approved_at` preenchidos pelo aprovador | Observe; Handoff (reentrega); Approve | `approved_by` vazio; o pedido é entregar por mensagem |
+| Handoff | `approved_by` e `approved_at` preenchidos pelo aprovador | Observe; Handoff (reentrega); Approve | `approved_by` vazio ou sem nome de pessoa; o pedido é entregar por mensagem |
 | Observe | Entrega por arquivo registrada; entrada no log de consumidores | Observe; Correction required; Recover | Erro reportado sobre um número sem entrega rastreável; nova versão sem lista de consumidores; três ou mais consumidores com número desalinhado |
 | Recover | Observe ou o Analytics lead escolheu rebuild, restatement ou retirement | Act ou Context (rebuild); Act, Verify, Approve e Handoff (restatement); terminal (retirement) | Consumidor sem contato; o número chegou a cliente externo; o rebuild repete o desalinhamento; não há log de consumidores |
 
@@ -187,9 +187,9 @@ stateDiagram-v2
 | **Entry condition** | Pacote de decisão completo: número + nome da métrica + versão implementada + período + data do extract + log de build + saída dos testes + relatório de verificação de definição (do Verify) |
 | **Required evidence** | Pacote de decisão conforme acima; registro assinado pelo approver com: nome, data, decisão explícita ("correto" ou "bloqueado com motivo"); para operações que envolvam destruição de mart: approver nomeado conforme POLICY-06 |
 | **Exit condition** | Approver nomeia a aprovação com todos os campos do pacote preenchidos e assina o registro; OU approver rejeita e documenta o motivo |
-| **Owner** | Analytics lead (Sofia Marques ou substituto nomeado); para operações destrutivas: approver nomeado conforme POLICY-06 |
+| **Owner** | Approver nomeado por uma pessoa (nome UNKNOWN hoje: nenhuma fonte nomeia o Analytics lead; Sofia Marques é dona das métricas e das políticas, e nenhuma fonte a identifica como Analytics lead); para operações destrutivas: approver nomeado conforme POLICY-06 |
 | **Allowed transitions** | → **Handoff** (aprovação registrada); → **Escalated** (approver recusa ou pede mais evidência); → **Correction required** (approver identifica erro no número) |
-| **Failure path** | Se o pacote de decisão não inclui versão da definição implementada: a skill recusa preparar o pacote e retorna ao Verify. Se o approver não estiver disponível dentro do deadline: registrar como **Escalated** com o deadline e escalar para Analytics lead. Se os testes de forma passaram mas o approver identifica que o número está errado: registrar como **Correction required** com evidência do erro — esta é a distinção "válido × correto" que INCIDENT-03 exemplifica. |
+| **Failure path** | Se o pacote de decisão não inclui versão da definição implementada: a skill recusa preparar o pacote e retorna ao Verify. Se o approver não estiver disponível dentro do deadline: registrar como **Escalated** com o deadline e escalar para Analytics lead. Se os testes de forma passaram mas o approver identifica que o número está errado: registrar como **Correction required** com evidência do erro — esta é a distinção "válido × correto" que INCIDENT-03 exemplifica. Se o approver não tem nome registrado: o pacote fica em `awaiting_approval` e o nome é pedido a uma pessoa; nunca é inferido do papel, do `owner:` de uma métrica ou de decisão anterior. |
 
 **Regra inviolável do Approve:** a skill prepara o pacote de decisão e propõe o próximo estado. A aprovação — o registro assinado com nome e data — é sempre ato de uma pessoa nomeada. A skill nunca registra uma aprovação que não aconteceu.
 
@@ -207,7 +207,7 @@ stateDiagram-v2
 
 4. **O extract inclui os campos necessários para a definição vigente.** O ciclo depende de que o banco operacional exporte `human_edit_material` (e qualquer outro campo exigido pelas definições futuras) antes que o Verify possa passar para o Approve com a definição v3 de `self_service_rate`. Hoje esse campo não existe no extract — o ciclo bloquearia em Context/Verify para qualquer request de `self_service_rate` v3 até o extract ser corrigido.
 
-5. **Existe um approver disponível antes do deadline.** Se o Analytics lead estiver ausente, o ciclo não tem um substituto nomeado. Isso é um risco aberto (ver Limitações).
+5. **Existe um approver com nome registrado antes do deadline.** O nome é UNKNOWN hoje: nenhuma fonte nomeia o Analytics lead. Se ele estiver ausente, o ciclo não tem um substituto nomeado. Isso é um risco aberto (ver Limitações).
 
 **Limitações:**
 
@@ -217,6 +217,7 @@ stateDiagram-v2
 | `suggestion_acceptance_rate` v1 não tem mart correspondente | Qualquer request para essa métrica ficaria preso em Route (sem implementação) | Lacuna registrada nos findings; requereria Act antes de poder continuar |
 | O log de consumidores não existe hoje | O ciclo propõe criá-lo, mas a primeira iteração real precisará de um processo de retroativamente registrar consumidores conhecidos | Sunder Retail Supply, help portal e REQUEST-005 são os três consumidores identificados retroativamente por INCIDENT-03 |
 | A causa real da mudança do número de Sunder Retail Supply (INCIDENT-03) permanece UNKNOWN | O ciclo proposto teria bloqueado antes de publicar, mas não resolve o mistério da causa original | O dado necessário para investigar (`human_edit_material`) não existe no extract atual |
+| O Analytics lead não tem nome em nenhuma fonte | O Approve não conclui sem uma pessoa nomeada; o nome é pedido, nunca inferido do papel, de `owner:` ou de decisão anterior, e só é herdado se uma pessoa o designar | `docs/incidents/INCIDENT-03.md` e `docs/how-we-work-today.md` só citam o papel |
 | O ciclo é descritivo (Módulo 1) — não há execução automatizada, hooks ou state engine | Cada transição depende de disciplina manual | O ciclo fornece a linguagem e os artefatos; o enforcement começa no Módulo 2 |
 
 ---
@@ -228,7 +229,7 @@ stateDiagram-v2
 | O número está correto (não só válido) | Testes de forma passam mesmo com definição errada (INCIDENT-03). Nenhum teste verifica se o número reflete o comportamento real da conta. | Analytics lead (Approve) | Pacote de decisão do Approve: número + versão + período + extract date + log de testes + relatório de verificação de definição |
 | Mudança de definição é segura durante período aberto | Depende de quem está consumindo, se os packs do período já foram publicados, e do risco de incomparabilidade entre períodos. Regras não capturam todos os cenários. | Analytics lead + Sofia Marques (Route/Escalated) | Lista de consumidores do Observe + período de publicações em aberto |
 | Dois requests são duplicatas | Requer contato com os dois solicitantes para confirmar se querem o mesmo número. A semântica ("automation rate" vs. "self-service") é julgamento humano. | Declan Byrne + solicitantes (Route) | Textos de REQUEST-007 e REQUEST-011 lado a lado; confirmação escrita dos solicitantes |
-| Approver para operação destrutiva | POLICY-06 exige approver nomeado. Quem tem autoridade depende do impacto — não é uma regra computável. | Analytics lead ou quem POLICY-06 designar (Approve) | `rebuild.py` alerta da necessidade; skill recusa avançar sem registro de aprovação |
+| Approver para operação destrutiva | POLICY-06 exige approver nomeado. Quem tem autoridade depende do impacto — não é uma regra computável. | Approver nomeado por uma pessoa; POLICY-06 exige o nome, mas não diz quem (Approve) | `rebuild.py` alerta da necessidade; skill recusa avançar sem registro de aprovação |
 
 ---
 
@@ -240,7 +241,7 @@ stateDiagram-v2
 | **Blocked** (request incompleto) | Route: métrica sem definição em `metric-definitions.yaml` ou request ambíguo | Solicitante contatado para esclarecimento; item aguarda | Sem retry automático — depende do solicitante | Declan Byrne → solicitante |
 | **Correction required** (pré-handoff) | Verify: mart implementa definição errada; Approve: approver recusa | Corrigir implementação → retornar ao Act → Verify | 1 retry; se exigir mudança de definição, escalar | Declan Byrne |
 | **Correction required** (pós-handoff) | Observe: consumidor reporta erro ou auditoria interna detecta | Abrir item de Recover; marcar entrega como "under review" no log | Sem retry — abre Restatement | Analytics lead |
-| **Escalated** | Route ou Approve: risco de POLICY, duplicata, mudança de definição | Analytics lead revisa e decide: retornar ao Route, rejeitar, ou aprovar o risco explicitamente | Sem limite — depende da decisão humana | Analytics lead (Sofia Marques) |
+| **Escalated** | Route ou Approve: risco de POLICY, duplicata, mudança de definição | Analytics lead revisa e decide: retornar ao Route, rejeitar, ou aprovar o risco explicitamente | Sem limite — depende da decisão humana | Analytics lead (nome UNKNOWN) |
 
 ---
 

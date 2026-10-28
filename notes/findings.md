@@ -137,6 +137,17 @@ Fonte: a execução do REQUEST-007 em 2026-09-29 (`evidence/*-REQUEST-007.md`, `
 
 ---
 
+## Lacunas que o trace contrafactual expôs nas skills
+
+Fonte: o trace de INCIDENT-03 (`traces/worked-case.md`, Trace 1), lido contra o texto das skills.
+
+| Skill | O que aconteceu | Estado |
+| :- | :- | :- |
+| `recover` | O passo 15 gravava `path: rebuild deferred` com "investigation only" e notificava os 3 consumidores. A skill só aceita rebuild, restatement e retirement e só notifica nos caminhos 2 e 3. Investigar antes de escolher não tem caminho, evidência nem saída | Registrado, não corrigido. Proposta para depois: um quarto caminho `investigation`, com entrada (causa UNKNOWN, sem figura corrigida), evidência, saída para um dos três e prazo. O grupo ainda não concordou o desenho. Até lá o trace termina em `path: pending` |
+| `approve`, `handoff` | O passo 10 gravava `approved_by: [name UNKNOWN]` com `status: approved` e seguia para Handoff; `lifecycle.md` escrevia "Analytics lead (Sofia Marques)". Nenhuma fonte nomeia o Analytics lead; Sofia Marques é dona de métricas e políticas | Corrigido neste commit: `approved_by` nunca é inferido de papel, de `owner:`, de `authorised_by` ou de aprovação anterior; `UNKNOWN`, papel e placeholder contam como vazio; um nome de outro registro só vale se uma pessoa o designar. `recover` herda a regra por referência ("same requirement as Approve") e não foi alterada |
+
+---
+
 ## Controle de leitura do track (hook)
 
 Decisão do grupo em 2026-09-29: manter o hook de `PreToolUse` em `.claude/settings.json` e corrigi-lo, embora seja escopo do Módulo 2 ("one interception point"). Motivo: o PR já declarava esse controle, e um controle declarado que não funciona é pior do que nenhum.

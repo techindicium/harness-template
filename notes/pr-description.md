@@ -11,7 +11,7 @@
 - No code was written to execute the lifecycle. All deliverables are prose, YAML, and Markdown.
 - Contradictions between source documents are registered in full; none were resolved by choosing a more plausible version.
 - No dates were estimated. Missing facts are recorded as UNKNOWN with the source where the search was conducted.
-- No approval is recorded by any skill. Skills prepare decision packages; approvals are human acts.
+- No approval is recorded by any skill. Skills prepare decision packages; approvals are human acts. No skill infers or inherits an approver's name; the Analytics lead is UNKNOWN in every source.
 
 **Non-goals:**
 - No tools, permissions, or state-engine code (Module 2 scope). One exception, recorded under Decision record:
@@ -43,7 +43,7 @@
 | `skills/route/SKILL.md` | Determines build path; detects mart/definition misalignment; checks POLICY-05/06/13 applicability |
 | `skills/act/SKILL.md` | Runs `project/run.py`; records definition version in build log |
 | `skills/verify/SKILL.md` | Distinguishes shape-test evidence from definition-alignment evidence; blocks Approve on misalignment |
-| `skills/approve/SKILL.md` | Assembles decision package only; never records approval; hard stop until named human signs |
+| `skills/approve/SKILL.md` | Assembles decision package only; never records approval; never infers the approver's name; hard stop until named human signs |
 | `skills/handoff/SKILL.md` | Delivers as file with provenance header; refuses message delivery; creates consumer log |
 | `skills/observe/SKILL.md` | Monitors consumer citations; triggers Recover on definition changes |
 | `skills/recover/SKILL.md` | Three paths (rebuild, restatement, retirement); notifies all consumers from Observe log |
@@ -169,7 +169,8 @@ Final state: Escalated to the Analytics team. Nothing was delivered. Full trace:
 | Item | Detail | Source |
 |------|--------|--------|
 | C6 — Real cause of INCIDENT-03 is UNKNOWN | The attributed cause (v2→v3) conflicts with change note 0088 (mart still on v2) and with the July pack (self-service 0 to 0.3478); the July extract's columns are UNKNOWN; the ticket the incident cites was opened later, about the dashboard (C15) | `notes/findings.md` §C6, §C15 |
-| Analytics lead name is UNKNOWN | Approve requires a named approver; POLICY-06 requires a named approver for destructive transforms; the Analytics lead who wrote INCIDENT-03 is not identified | `docs/incidents/INCIDENT-03.md` |
+| Analytics lead name is UNKNOWN | Approve requires a named approver; POLICY-06 requires a named approver for destructive transforms; the Analytics lead who wrote INCIDENT-03 is not identified. The skill asks a person for the name and never infers it from the role, a metric owner or an earlier decision; a name from another record counts only if a named person designates it | `docs/incidents/INCIDENT-03.md`, `docs/how-we-work-today.md` |
+| `recover` has no investigate-first path | With the cause UNKNOWN and no corrected figure, the skill accepts only rebuild, restatement or retirement; the INCIDENT-03 trace ends at `path: pending`. A fourth path is proposed for a later iteration and not designed | `notes/findings.md` |
 | `self_service_rate` v3 structurally blocked | Every request for v3 will block at Context until `data/ops-extract/suggestion.csv` includes `human_edit_material`; this requires a change to the extract query and to the operational database schema | `data/ops-extract/suggestion.csv`; `project/metrics/metric-definitions.yaml` |
 | Consumer log does not exist today | The first real execution of the lifecycle must retroactively populate it with the three consumers identified in INCIDENT-03 | ISSUE-30, `data/tracker.csv`; `docs/incidents/INCIDENT-03.md` |
 | `suggestion_acceptance_rate` v1 has no mart | Any request for this metric blocks at Route (no implementation to build from) | `project/metrics/metric-definitions.yaml`; glob of `project/models/marts/` |
@@ -207,7 +208,7 @@ The executable lifecycle (Module 2) would add:
 3. **Version citation injected at Act:** the build log currently requires the operator to manually record `definition_version_in_effect`. In Module 2, `run.py` would emit this field into the mart output directly, making POLICY-13 compliance automatic.
 4. **Consumer log as a queryable artifact:** the current consumer log is a Markdown file. Module 2 would make it a structured CSV or database table that Observe and Recover can query by metric, version, and period — enabling automated notification drafts when a definition changes.
 5. **Named approver slot enforced by the harness:** the `approve` skill currently leaves `approved_by` blank and waits. Module 2 would gate the Handoff transition on this field being non-empty, enforcing the rule mechanically rather than by instruction.
-6. **Recover exercised after a clean Handoff:** the INCIDENT-03 trace now shows that version provenance alone does not close a consumer magnitude dispute — Observe → Recover still needs a human path choice when root cause remains UNKNOWN (C6).
+6. **Recover exercised after a clean Handoff:** the INCIDENT-03 trace now shows that version provenance alone does not close a consumer magnitude dispute — Observe → Recover still needs a human path choice when root cause remains UNKNOWN (C6). Recover also has no path for investigating first (see Limitations).
 
 ---
 
