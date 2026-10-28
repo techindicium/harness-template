@@ -71,6 +71,9 @@ be true.
 0.2841). The number of tools at session start differed between the two sessions (37 and 29) with
 the same flags; the cause was not investigated: UNKNOWN.
 
+The `handoff` skill gained a first step that runs the gate check after these runs. All six requests
+used the skill text without it.
+
 The before-artifact the model wrote is quoted here, because it was removed from the working tree
 afterwards (it was untracked and created by the experiment). It is accurate in content and is the
 failure shape anyway: a file named `handoff-REQUEST-007.md` exists for an item that is not clear.
@@ -186,9 +189,17 @@ back to the user.
 - In the permission mode used here, a write inside the project is accepted without a prompt, so
   before the gate a human prompt was not a barrier in this setup. In interactive default mode a
   prompt would appear. That was not run.
+- The shared project settings, and so the hooks, are read from the directory the session starts in.
+  A session started anywhere else does not load them.
 
 ## 10. Limitations
 
+- The gate applies to sessions started at the repository root. A session started in a parent folder,
+  in a subfolder of the repository or in the track repository does not load the project hooks. This
+  is from the Claude Code settings documentation and was not tested in a live session. `/status`
+  lists the settings files that loaded, `/cd` to the repository root reloads them, and the
+  `handoff` skill runs the same check as its first step, which does not depend on the hooks. The
+  read-only hook from Module 1 has the same limit.
 - The gate trusts fields the model can also write. It catches evidence that contradicts itself
   (a clear status next to a verdict that is not clear), not a clear and consistent falsehood.
 - A name built at run time, a glob, or a script written earlier is only found afterwards, by the

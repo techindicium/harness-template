@@ -62,6 +62,21 @@ The hook command is anchored on the project directory variable, so a change of d
 make it fail to start. That matters because a hook that fails to start exits with a code that does
 not block.
 
+## Where it applies
+
+The project settings file is read from the directory the session starts in. The gate therefore
+applies to sessions started at the repository root, and not to a session started in a parent
+folder, in a subfolder of the repository or in the track repository. This comes from the Claude Code
+settings documentation and was not tested in a live session. The read-only hook from Module 1 has
+the same limit.
+
+- To check it, run `/status` and confirm that the project settings are listed. Inside a session,
+  `/cd` to the repository root reloads them.
+- The `handoff` skill runs the same check as its first step. That step does not depend on the hooks
+  being loaded, only on the skill being followed. It was added after the live runs recorded in the
+  trace, which used the skill without it.
+- Making the gate apply in every folder needs managed settings, which is Module 3.
+
 ## Not tied to one harness
 
 `scripts/hooks/handoff_gate.py` has three layers. The core is pure functions and does not know any
@@ -113,6 +128,7 @@ harness caps consecutive continuations.
 
 ## Known limitations
 
+- The gate applies only to sessions started at the repository root (see "Where it applies").
 - The gate trusts fields the model can also write: it catches evidence that contradicts itself, not
   a consistent falsehood.
 - A refusal record cannot be written at the protected path, because the gate keys on the path and
