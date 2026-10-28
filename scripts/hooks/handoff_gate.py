@@ -48,8 +48,8 @@ from datetime import datetime, timezone
 # Stage -> (check key, required fields). A value is compared without case; "@person" and
 # "@date" are the two checks that are not an equality. The check key selects the wording of
 # the block message. Change the fields here to move the gate to another process. Approval is read
-# from the two fields a person fills, not from `status`: the approve skill leaves its package at
-# `status: awaiting_approval` and nobody is told to change it.
+# from the two fields a person fills. `status` is a label: the approve and handoff skills both say
+# that Handoff does not read it.
 CONTRACT = (
     ("approve", "approval", (("approved_by", "@person"), ("approved_at", "@date"))),
     (

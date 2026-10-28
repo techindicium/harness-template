@@ -243,10 +243,6 @@ back to the user.
 - Every gated decision, `allow` included, is appended to the versioned decision log. Whether the
   log stays versioned is not decided.
 - The approver check is a list of words, so a job title that uses no listed word passes.
-- The `handoff` skill lists `status: approved` as an entry condition, while the `approve` skill
-  leaves the package at `status: awaiting_approval` until a person fills `approved_by` and
-  `approved_at`, and does not say who changes it. The gate reads the two fields and not `status`.
-  Whether to require `status: approved` as well is not decided.
 
 ## 11. Reproduce
 

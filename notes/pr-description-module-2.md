@@ -43,7 +43,7 @@ An artifact is a file named `handoff-<ID>.md` (kept in `evidence/`) or `figures-
 
 | Evidence | Required |
 | :- | :- |
-| `approve-<ID>.md` | `approved_by` a person's name (not empty, `UNKNOWN`, `none`, a placeholder or a role), `approved_at` an ISO date. `status` is not read: the two Module 1 skills disagree about it (see "Known limitations") |
+| `approve-<ID>.md` | `approved_by` a person's name (not empty, `UNKNOWN`, `none`, a placeholder or a role), `approved_at` an ISO date. `status` is not read: the `approve` and `handoff` skills define the approval as these two fields and `status` as a label |
 | `verify-<ID>.md` | `verify_status: clear` with the three verdicts `pass`, `aligned` and `match` |
 | `context-<ID>.md` | `period_match: true` |
 | `build-<ID>.md` | `exit_code: 0` |
@@ -182,12 +182,6 @@ documentation.
   `traces/gate-decisions.jsonl`. Whether the log stays versioned is not decided.
 - The approver check is a list of words. A value that is not a person and is not on the list, such
   as a job title that uses no listed word, passes.
-- The two Module 1 skills disagree about `status` in the approval evidence. The `handoff` skill
-  lists `status: approved` as an entry condition. The `approve` skill leaves the package at
-  `status: awaiting_approval` until a person fills `approved_by` and `approved_at`, and does not say
-  who changes it. The gate reads the two fields and not `status`, so on this one field it is looser
-  than the wording of the `handoff` skill. Whether to require `status: approved` as well is not
-  decided.
 
 ## Next improvement
 
