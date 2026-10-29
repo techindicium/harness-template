@@ -1,0 +1,15 @@
+# Review is required from a person for every path that decides what the guard trusts.
+# Proposed owner: the repository owner. Replace with the group's lifecycle owner and the policy owners.
+/governance/                 @luiseduardofort
+/lifecycle/**/*.signature.yaml @luiseduardofort
+/lib/                        @luiseduardofort
+/states/                     @luiseduardofort
+/.claude/                    @luiseduardofort
+/.github/                    @luiseduardofort
+/hooks/                      @luiseduardofort
+/evals/cases/                 @luiseduardofort
+/evals/*.py                   @luiseduardofort
+/evals/*.md                   @luiseduardofort
+/evals/baseline.json          @luiseduardofort
+/evals/human-grades.yaml      @luiseduardofort
+/skills/approve/evidence-review.md @luiseduardofort
