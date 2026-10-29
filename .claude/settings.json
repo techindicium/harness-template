@@ -9,6 +9,25 @@
             "command": "python3 -c \"import sys, json; ti = json.load(sys.stdin).get('tool_input', {}); p = ti.get('file_path') or ti.get('notebook_path') or ''; bad = '/portwell-analytics/' in p; bad and print('Blocked: portwell-analytics is the track repository and is read-only. Write under harness-template instead.', file=sys.stderr); sys.exit(2 if bad else 0)\""
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/handoff_gate.py hook"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/handoff_gate.py hook"
+          }
+        ]
       }
     ]
   }
