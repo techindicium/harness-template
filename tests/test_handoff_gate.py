@@ -56,6 +56,76 @@ BLOCKED = {
 SECTIONS = ("BLOCKED", "WHY", "FOUND", "DO NOT", "NEXT", "ASK THE USER")
 PRODUCT_NAMES = re.compile(r"claude|anthropic|openai|gpt|codex|cursor|copilot|gemini", re.I)
 
+# The files of the track repository the gate reads, as the paths it reads them at.
+CSV = "data/ops-extract/interaction.csv"
+SQL = "project/models/marts/first_response.sql"
+PY = ".venv/bin/python"
+WAREHOUSE = "warehouse.duckdb"
+
+# The shape of the real mart: two tables, one actor filter under a WHERE, and a CASE elsewhere (a CASE
+# is no reason to refuse a mart). `portal` is in the filter and not in the extract, as in the real track.
+FIRST_RESPONSE_SQL = (
+    "-- first response\n"
+    "CREATE OR REPLACE TABLE marts.first_response AS\n"
+    "SELECT ticket_id FROM staging.interactions i\n"
+    "    WHERE i.actor IN ('agent', 'portal')\n"
+    "    GROUP BY ticket_id;\n"
+    "CREATE OR REPLACE TABLE marts.first_response_p50 AS\n"
+    "SELECT CASE WHEN count(*) >= 20 THEN 1 ELSE NULL END AS p50 FROM marts.first_response;\n"
+)
+# The other two marts of the real track: they define a table each and filter no actor.
+OTHER_MARTS = {
+    "project/models/marts/self_service.sql": "CREATE OR REPLACE TABLE marts.self_service AS SELECT 1;\n",
+    "project/models/marts/sla_attainment.sql": "CREATE OR REPLACE TABLE marts.sla_attainment AS SELECT 1;\n",
+}
+MARTS_OK = "first_response 938\nfirst_response_p50 30\nself_service 30\nsla_attainment 30\n"
+
+
+def interactions_csv(counts):
+    """An interaction extract with `counts[actor]` rows for each actor."""
+    rows = ["interaction_id,ticket_id,occurred_at,actor,kind"]
+    for actor, count in counts.items():
+        rows += [f"{len(rows)},TICKET-{len(rows)},2026-08-01T10:00:00,{actor},message" for _ in range(count)]
+    return "\n".join(rows) + "\n"
+
+
+def track_python(output="", code=0, command=""):
+    """A stand-in for the track's interpreter: a shell script that ignores its arguments and answers
+    with canned output. It tests how the gate reads an answer, not the query the answer comes from."""
+    return f"#!/bin/sh\n{command}cat <<'EOF'\n{output}EOF\nexit {code}\n"
+
+
+def recording_python(output):
+    """A stand-in that also writes each argument it is given beside itself, one file per argument."""
+    return (
+        "#!/bin/sh\n"
+        'here=$(dirname "$0")\n'
+        "n=0\n"
+        'for arg in "$@"; do n=$((n + 1)); printf \'%s\' "$arg" > "$here/arg.$n"; done\n'
+        f"cat <<'EOF'\n{output}EOF\n"
+    )
+
+
+def mart_sql(body):
+    """A first response mart whose filter is `body`, with the two tables the real one defines."""
+    return (
+        f"CREATE OR REPLACE TABLE marts.first_response AS SELECT ticket_id FROM staging.interactions i {body};\n"
+        "CREATE OR REPLACE TABLE marts.first_response_p50 AS SELECT 1;\n"
+    )
+
+
+# The shape of the real extract: the portal's replies are called `assist`, and the mart does not count them.
+ASSIST_TRACK = {CSV: interactions_csv({"agent": 2, "assist": 3, "customer": 3})}
+
+
+def with_metric(intake, route=None):
+    """CLEAN evidence plus the intake note that names the metric, and the route note when given."""
+    evidence = dict(CLEAN)
+    evidence[f"intake-{ITEM}.md"] = f"metric_name: {intake}\n"
+    if route is not None:
+        evidence[f"route-{ITEM}.md"] = f"metric_name: {route}\n"
+    return evidence
+
 
 def load_gate():
     spec = importlib.util.spec_from_file_location("handoff_gate", SCRIPT)
@@ -67,7 +137,7 @@ def load_gate():
 class GateCase(unittest.TestCase):
     """Builds a throwaway project and runs the gate against it."""
 
-    def project(self, evidence):
+    def project(self, evidence, track=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         proj = Path(tmp.name).resolve()
@@ -75,7 +145,33 @@ class GateCase(unittest.TestCase):
             (proj / sub).mkdir()
         for name, text in evidence.items():
             (proj / "evidence" / name).write_text(text)
+        self.track(proj, track or {})
         return proj
+
+    def track(self, proj, files):
+        """A throwaway track repository that `proj` points at. It is clean unless `files` replaces one
+        of its files; a value of None leaves that file out."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name).resolve()
+        content = {
+            CSV: interactions_csv({"agent": 2, "customer": 3}),
+            SQL: FIRST_RESPONSE_SQL,
+            WAREHOUSE: "",
+            PY: track_python(MARTS_OK),
+            **OTHER_MARTS,
+        }
+        content.update(files)
+        for name, text in content.items():
+            if text is None:
+                continue
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+            if name == PY:
+                path.chmod(0o755)
+        (proj / "track.yaml").write_text(f"context_repository: {root}  # local path\n")
+        return root
 
     def run_gate(self, proj, args, stdin="", cwd=None, env_extra=None, keep_project_env=True):
         env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_PROJECT_DIR", "HANDOFF_GATE_LOG")}
@@ -491,6 +587,175 @@ class TestTrace(GateCase):
         self.run_gate(proj, ["hook"], stdin=json.dumps(payload), env_extra={"HANDOFF_GATE_LOG": str(elsewhere)})
         self.assertTrue(elsewhere.exists())
         self.assertEqual(self.records(proj), [])
+
+
+class TestIndependentBuildCheck(GateCase):
+    """What the gate computes from the track repository, whatever the evidence files say."""
+
+    def setUp(self):
+        self.gate = load_gate()
+
+    def failures(self, track=None):
+        proj = self.project(CLEAN, track)
+        return self.gate.check_item(proj / "evidence", ITEM)
+
+    def checks(self, track=None):
+        return {f["check"] for f in self.failures(track)}
+
+    def test_a_clean_track_adds_no_failure(self):
+        self.assertEqual(self.failures(), [])
+
+    def test_an_actor_the_mart_does_not_count_is_not_clear(self):
+        # The shape of the real extract: the portal's replies are called `assist`.
+        (item,) = self.failures(ASSIST_TRACK)
+        self.assertEqual((item["check"], item["field"], item["found"]), ("coverage", "actor", "assist (3 interactions)"))
+        self.assertIn("portal is not in the extract", item["expected"])
+
+    def test_a_block_comment_does_not_count_as_a_filter(self):
+        comment = "/* WHERE i.actor IN ('agent', 'assist') */ WHERE i.actor IN ('agent')"
+        (item,) = self.failures({**ASSIST_TRACK, SQL: mart_sql(comment)})
+        self.assertEqual((item["check"], item["found"]), ("coverage", "assist (3 interactions)"))
+
+    def test_an_actor_declared_as_not_a_response_is_clear(self):
+        self.assertEqual(self.failures({CSV: interactions_csv({"agent": 1, "customer": 4})}), [])
+
+    def test_a_filter_naming_an_actor_the_extract_lacks_does_not_block(self):
+        self.assertEqual(self.failures({CSV: interactions_csv({"agent": 2})}), [])
+
+    def test_unreadable_extract_or_filter_fails_closed(self):
+        cases = {
+            "missing extract": {CSV: None},
+            "extract without an actor column": {CSV: "interaction_id,ticket_id\n1,TICKET-1\n"},
+            "extract with a header and no rows": {CSV: "interaction_id,ticket_id,occurred_at,actor,kind\n"},
+            "missing mart": {SQL: None},
+            "mart without an actor filter": {SQL: "WHERE i.actor <> 'customer'\n"},
+            "two actor filters, one under NOT": {
+                SQL: mart_sql("WHERE i.actor IN ('agent', 'assist') AND NOT i.actor IN ('assist')")
+            },
+            "an actor filter that is only inside a CASE": {
+                SQL: "CREATE OR REPLACE TABLE marts.first_response AS "
+                "SELECT CASE WHEN i.actor IN ('agent') THEN 1 END FROM staging.interactions i;\n"
+            },
+            "an actor filter joined by OR": {SQL: mart_sql("WHERE i.kind = 'x' OR i.actor IN ('agent')")},
+        }
+        for name, files in cases.items():
+            with self.subTest(name):
+                self.assertEqual(self.checks(files), {"cannot_evaluate"})
+
+    def test_a_project_that_does_not_name_its_track_fails_closed(self):
+        cases = {
+            "no track.yaml": None,
+            "no context_repository": "group: grupo-5\n",
+            "a path that is not a directory": "context_repository: /nonexistent/track\n",
+        }
+        for name, text in cases.items():
+            with self.subTest(name):
+                proj = self.project(CLEAN)
+                if text is None:
+                    (proj / "track.yaml").unlink()
+                else:
+                    (proj / "track.yaml").write_text(text)
+                checks = {f["check"] for f in self.gate.check_item(proj / "evidence", ITEM)}
+                self.assertEqual(checks, {"cannot_evaluate"})
+
+    def test_a_mart_without_rows_is_not_clear(self):
+        listing = "first_response 938\nfirst_response_p50 30\nself_service 0\nsla_attainment 30\n"
+        (item,) = self.failures({PY: track_python(listing)})
+        self.assertEqual((item["check"], item["field"], item["found"]), ("marts", "self_service", "0 rows"))
+
+    def test_a_mart_the_track_defines_but_the_warehouse_lacks_is_not_clear(self):
+        # rebuild.py drops a mart: the warehouse then lists fewer tables than the SQL of the track creates.
+        (item,) = self.failures({PY: track_python("first_response 938\nself_service 30\nsla_attainment 30\n")})
+        self.assertEqual((item["check"], item["field"], item["found"]), ("marts", "first_response_p50", "missing"))
+
+    def test_no_mart_at_all_is_not_clear(self):
+        self.assertEqual(self.checks({PY: track_python("")}), {"marts"})
+
+    def test_the_query_runs_isolated_and_read_only(self):
+        proj = self.project(CLEAN, {PY: recording_python(MARTS_OK)})
+        track = Path(proj.joinpath("track.yaml").read_text().split(":", 1)[1].split("#")[0].strip())
+        self.assertEqual(self.gate.check_item(proj / "evidence", ITEM), [])
+        args = [(track / ".venv" / "bin" / f"arg.{n}").read_text() for n in (1, 2, 3, 4)]
+        self.assertEqual(args[:2], ["-I", "-c"])
+        self.assertIn("read_only=True", args[2])
+        self.assertEqual(args[3], str(track / WAREHOUSE))
+
+    def test_a_track_that_cannot_answer_fails_closed(self):
+        self.gate.TRACK_TIMEOUT = 1
+        cases = {
+            "interpreter exits with an error": {PY: track_python(MARTS_OK, code=1)},
+            "interpreter is missing": {PY: None},
+            "interpreter answers with something that is not a count": {PY: track_python("first_response many\n")},
+            "interpreter answers with a byte that is not text": {PY: track_python(command="printf '\\377\\n'\n")},
+            "no warehouse to read": {WAREHOUSE: None},
+            "interpreter does not answer in time": {PY: track_python(command="exec sleep 5\n")},
+            "no SQL that defines a mart": {
+                SQL: "WHERE i.actor IN ('agent', 'portal')\n",
+                **{name: None for name in OTHER_MARTS},
+            },
+        }
+        for name, files in cases.items():
+            with self.subTest(name):
+                self.assertEqual(self.checks(files), {"cannot_evaluate"})
+
+    def test_an_item_whose_metric_does_not_read_interactions_is_not_held_by_the_actor_check(self):
+        # REQUEST-007 asks for self_service_rate, which is built from tickets and suggestions only.
+        proj = self.project(with_metric("self_service_rate"), ASSIST_TRACK)
+        self.assertEqual(self.gate.check_item(proj / "evidence", ITEM), [])
+        self.assertPasses(self.write(proj, str(proj / "delivery" / FIGURES)))
+
+    def test_the_actor_check_applies_unless_the_evidence_names_such_a_metric(self):
+        cases = {
+            "a first response metric": with_metric("first_response_minutes_p50"),
+            "an unknown metric": with_metric("something_else"),
+            "no note at all": dict(CLEAN),
+            "intake and route that disagree": with_metric("self_service_rate", route="first_response_minutes_p50"),
+        }
+        for name, evidence in cases.items():
+            with self.subTest(name):
+                proj = self.project(evidence, ASSIST_TRACK)
+                checks = {f["check"] for f in self.gate.check_item(proj / "evidence", ITEM)}
+                self.assertEqual(checks, {"coverage"})
+
+    def test_an_empty_mart_still_blocks_a_self_service_item(self):
+        proj = self.project(with_metric("self_service_rate"), {PY: track_python("self_service 0\n")})
+        checks = {f["check"] for f in self.gate.check_item(proj / "evidence", ITEM)}
+        self.assertEqual(checks, {"marts"})
+
+    def test_each_question_cites_its_own_reason(self):
+        # Found on the real item: the question about the actor cited the verify status.
+        proj = self.project(BLOCKED, ASSIST_TRACK)
+        err = self.assertBlocked(self.write(proj, str(proj / "evidence" / HANDOFF)))
+        self.assertIn(f"For {ITEM}: actor is assist (3 interactions).", err)
+        self.assertIn(f"Verify for {ITEM} is blocked (verify_status is blocked)", err)
+
+    def test_a_reason_without_a_field_is_not_prefixed_by_a_dash(self):
+        proj = self.project(CLEAN, {PY: None})
+        err = self.assertBlocked(self.write(proj, str(proj / "evidence" / HANDOFF)))
+        self.assertIn(f"could not evaluate {ITEM} (could not run (FileNotFoundError))", err)
+
+    def test_the_stop_audit_catches_a_track_failure(self):
+        proj = self.project(CLEAN, ASSIST_TRACK)
+        (proj / "evidence" / HANDOFF).write_text("x\n")
+        err = self.assertBlocked(self.stop(proj))
+        self.assertIn("assist (3 interactions)", err)
+        clean = self.project(CLEAN)
+        (clean / "evidence" / HANDOFF).write_text("x\n")
+        self.assertPasses(self.stop(clean))
+
+    def test_the_handoff_is_blocked_although_the_evidence_is_clear(self):
+        proj = self.project(CLEAN, ASSIST_TRACK)
+        err = self.assertBlocked(self.write(proj, str(proj / "delivery" / FIGURES)))
+        for section in SECTIONS:
+            self.assertRegex(err, rf"(?m)^{section}\b", f"missing section {section}")
+        self.assertIsNone(PRODUCT_NAMES.search(err.replace(str(proj), "")))
+        self.assertIn("assist (3 interactions)", err)
+        self.assertIn("outbound response", err)
+        code, err = self.run_gate(proj, ["check", ITEM], keep_project_env=False)
+        self.assertEqual(code, 1)
+        self.assertIn("assist", err)
+        clean = self.project(CLEAN)
+        self.assertPasses(self.write(clean, str(clean / "delivery" / FIGURES)))
 
 
 class TestRealEvidence(GateCase):

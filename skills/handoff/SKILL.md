@@ -12,7 +12,7 @@ Deliver the approved build output to the requester as a file that includes its o
 - `evidence/approve-<REQUEST-NNN>.md` exists with `approved_by` and `approved_at` filled by the named approver. `status` is a label and is not an entry condition.
 - No block or escalation is recorded in any prior evidence file.
 - `approved_by` holds a person's name. Blank, `UNKNOWN`, a role and a placeholder do not count.
-- The handoff gate check exits 0 for the item: `python3 scripts/hooks/handoff_gate.py check <REQUEST-NNN>`, run from the repository root. It reads the same evidence as the conditions above, plus the period and the build, and prints what to do when it exits 1. Any other non-zero exit means the check did not run: treat the item as not clear.
+- The handoff gate check exits 0 for the item: `python3 scripts/hooks/handoff_gate.py check <REQUEST-NNN>`, run from the repository root. It reads the same evidence as the conditions above, plus the period and the build, and it reads the track repository itself: the actors of the interaction extract against the filter of the first response mart (skipped for a metric that does not read interactions), and every mart of the warehouse for rows. It prints what to do when it exits 1; a track it cannot read counts as not clear. Any other non-zero exit means the check did not run: treat the item as not clear.
 
 ## Required context
 - `evidence/approve-<REQUEST-NNN>.md` — to read `approved_by`, `approved_at`, `definition_version_in_effect`, `policy_13_citation`
