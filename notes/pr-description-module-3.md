@@ -43,8 +43,8 @@ conditions, in the same gate. The control does not decide whether an interaction
 The scope is decided on purpose. The check of marts applies to every item. The check of actors
 applies to an item unless its intake or route note names a metric that does not read the interaction
 extract, which today is only `self_service_rate`. A self-service item such as REQUEST-007 is not held
-by a defect in first response. A missing note, an unknown metric or two notes that disagree leave the
-check of actors on.
+by a defect in first response. No note that names a metric, an unknown metric and two notes that
+disagree leave the check of actors on. One note that names `self_service_rate` is enough to skip it.
 
 ## Control record
 
@@ -80,8 +80,8 @@ Owner of the control: to be named by the group.
 
 | Check | Reads | Not clear when |
 | :- | :- | :- |
-| `coverage` | `data/ops-extract/interaction.csv` and `project/models/marts/first_response.sql`, in the track | An actor in the extract is not in the `actor IN (...)` list of the mart and not in `NON_RESPONSE_ACTORS`. A mart filter that names an actor the extract lacks is noted in the message and does not block. Skipped when the intake or route note names a metric in `ACTOR_FREE_METRICS` and no other |
-| `marts` | The SQL under `project/models/marts` (the tables it creates) and `warehouse.duckdb`, through `.venv/bin/python` of the track, read-only, 30 seconds at most | A table the SQL creates is missing from the warehouse, or has zero rows |
+| `coverage` | `data/ops-extract/interaction.csv` and `project/models/marts/first_response.sql`, in the track | An actor in the extract, compared as written (case and spaces count, as in the warehouse), is not in the `actor IN (...)` list of the mart and not in `NON_RESPONSE_ACTORS`. A mart filter that names an actor the extract lacks is noted in the message and does not block. Skipped when the intake or route note names a metric in `ACTOR_FREE_METRICS` and no other |
+| `marts` | The SQL under `project/models/marts` (the tables it creates) and `warehouse.duckdb`, through `.venv/bin/python` of the track, read-only, 30 seconds at most | A table the SQL creates is missing from the warehouse, or any table of its `marts` schema has zero rows |
 | `cannot_evaluate` | Everything above, and `track.yaml` | `track.yaml` is missing or has no `context_repository`; the path is not a directory; the extract or the mart is unreadable, has no actor column, no rows, or not exactly one plain `WHERE ... actor IN (...)` filter (a second filter, a `NOT`, an `OR` or a `CASE` in the way, or none); no SQL creates a mart; the warehouse or the interpreter is missing, exits with an error, times out or answers with something that is not `<mart> <rows>` |
 
 `NON_RESPONSE_ACTORS` holds `customer`. That is an assumption of the group, written in a comment at
@@ -150,8 +150,8 @@ keeps refusing.
 
 ## Evidence
 
-- **Reproducible.** `env PYTHONDONTWRITEBYTECODE=1 python3 tests/test_handoff_gate.py` passes 64
-  tests: the 45 of Module 2 with their assertions unchanged, and 19 new ones. Only the test helper
+- **Reproducible.** `env PYTHONDONTWRITEBYTECODE=1 python3 tests/test_handoff_gate.py` passes 66
+  tests: the 45 of Module 2 with their assertions unchanged, and 21 new ones. Only the test helper
   `project()` changed for the old tests: it now builds a clean track by default. REQUEST-007 asks
   for self-service, so the real item is not held by the actor check. From the repository root with
   `../portwell-analytics` built, the two commands print the same message and both exit 1, because
@@ -167,17 +167,22 @@ keeps refusing.
   `test_the_actor_check_applies_unless_the_evidence_names_such_a_metric`. The same decision on the
   real track is in the last-but-one bullet.
 - **Red first.** The helper and the new cases were written before the script changed: 55 tests, the 45
-  old ones passing, 14 failures and 2 errors, all in the new class. Two more cases were added after
+  old ones passing and 7 of the 10 new ones failing (14 failures and 2 errors, counting sub-tests). Two more cases were added after
   the first run on the real item found the reason defect above, and failed before the fix. Three
   cases for the scope were added after the decision on the scope: the exemption case failed before
   the change, and the other two guard the other side (the check stays on, and the marts check is not
-  scoped). A review of the diff then found paths where something unreadable or unexpected let an
+  scoped). Two reviews of the diff then found paths where something unreadable or unexpected let an
   item through: a mart missing from the warehouse, a filter hidden in a comment, a `NOT` or a `CASE`
-  around the filter, an extract with no rows, interpreter output that is not text. Each got a case
-  that failed before its fix. Seven mutations of the script each turn a test red on a scratch copy: a
-  lost `read_only=True`, a lost `-I`, strict decoding, a missing mart not reported, block comments not
-  stripped, an extract with no rows accepted, and any `CASE` in the mart refused. The last one turns
-  32 red, because the real mart has a `CASE` and must not be refused for it.
+  around the filter, an extract with no rows, interpreter output that is not text, and an actor padded
+  with a space or written in another case. Each got a case that failed before its fix. The second
+  review also showed that four guards of the filter reader (`NOT`, `CASE`, `;` and a line comment)
+  were refused by other checks and pinned by no case. Each now has a case with exactly one actor
+  filter, so counting filters cannot be what refuses it. Thirteen mutations of the script each turn a
+  test red on a scratch copy: a lost `read_only=True`, a lost `-I`, strict decoding, a missing mart
+  not reported, block comments not stripped, line comments not stripped, an extract with no rows
+  accepted, a trimmed actor, each of the four guards of the filter reader (`NOT`, `CASE`, `;`, `OR`),
+  and any `CASE` in the mart refused. The last one turns 33 red, because the real mart has a `CASE`
+  and must not be refused for it.
 - **Reported, not versioned.** Throwaway projects with clear evidence, an intake note and a
   `track.yaml` pointing at the real track, for a write of `delivery/figures-REQUEST-007.csv`. For an
   item whose metric is `first_response_minutes_p50`, the gate of `1c2c19b` let the write through
@@ -202,16 +207,21 @@ keeps refusing.
   seen.
 - The actor check is skipped on the word of a note the model writes. The `metric_name` of the intake
   or route note decides whether the check applies, so a model that writes `self_service_rate` for an
-  item that delivers first response figures switches the check off. Only that one metric is exempt,
-  and a missing note, an unknown metric or two notes that disagree leave the check on. This is the
+  item that delivers first response figures switches the check off. Only that one metric is exempt.
+  One note is enough to skip the check, so a single line in the intake note does it; no note that
+  names a metric, an unknown metric and two notes that disagree leave the check on. This is the
   weakness the control removes elsewhere, kept here on purpose so that a self-service item is not
   held by a defect in first response.
 - The check of marts is not scoped: a missing or empty mart blocks every item, whatever its metric.
-  The marts the warehouse must hold are the tables the SQL under `project/models/marts` creates.
+  The marts the warehouse must hold are the tables the SQL under `project/models/marts` creates. A
+  stale empty table of the `marts` schema that no SQL creates also blocks.
 - With today's extract, every item whose metric reads interactions is held until the owner decides
   about `assist` or the mart is corrected. Both exits depend on people outside the group.
 - The gate reads the warehouse that exists now. It is a gitignored file, and nothing ties it to the
   build of this item. `staging.extract_metadata` records the build time and not the extract time (C10).
+- The actor check reads the extract CSV and the marts check reads the warehouse. A warehouse built from
+  another source (`run.py --live` points at a repository that is not cloned here) is not the CSV the
+  gate counts.
 - A mart with rows is not a correct mart. The check is that the build produced something.
 - The tests of the interpreter use a stand-in shell script. They show how the gate reads an answer
   and that it fails closed. One of them records the arguments and pins `-I`, `-c`, the path of the

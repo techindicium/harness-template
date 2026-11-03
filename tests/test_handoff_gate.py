@@ -616,6 +616,15 @@ class TestIndependentBuildCheck(GateCase):
         (item,) = self.failures({**ASSIST_TRACK, SQL: mart_sql(comment)})
         self.assertEqual((item["check"], item["found"]), ("coverage", "assist (3 interactions)"))
 
+    def test_an_actor_is_compared_as_the_warehouse_compares_it(self):
+        # DuckDB keeps the space and the case, and `actor IN ('agent', ...)` is an exact match, so the
+        # mart drops these rows. A gate that trimmed the value would count them as covered.
+        extract = interactions_csv({"agent": 1, " agent": 1, "Agent": 1, "customer": 1})
+        (item,) = self.failures({CSV: extract})
+        self.assertEqual(item["check"], "coverage")
+        self.assertIn("' agent' (1 interaction)", item["found"])
+        self.assertIn("Agent (1 interaction)", item["found"])
+
     def test_an_actor_declared_as_not_a_response_is_clear(self):
         self.assertEqual(self.failures({CSV: interactions_csv({"agent": 1, "customer": 4})}), [])
 
@@ -637,6 +646,18 @@ class TestIndependentBuildCheck(GateCase):
                 "SELECT CASE WHEN i.actor IN ('agent') THEN 1 END FROM staging.interactions i;\n"
             },
             "an actor filter joined by OR": {SQL: mart_sql("WHERE i.kind = 'x' OR i.actor IN ('agent')")},
+            # Each of these has exactly one actor filter, so counting filters cannot be what refuses it.
+            "a NOT in front of the only actor filter": {SQL: mart_sql("WHERE NOT i.actor IN ('customer')")},
+            "a CASE in front of the only actor filter": {
+                SQL: mart_sql("WHERE CASE WHEN i.kind = 'x' THEN 1 END = 1 AND i.actor IN ('agent')")
+            },
+            "an actor filter that belongs to another statement": {
+                SQL: "SELECT ticket_id FROM staging.interactions i WHERE i.kind = 'x';\n"
+                "SELECT count(*) FROM staging.interactions i JOIN t ON i.actor IN ('agent');\n"
+            },
+            "a line comment that hides the only actor filter": {
+                SQL: "-- WHERE i.actor IN ('agent', 'assist')\nSELECT 1 FROM staging.interactions i WHERE i.kind = 'x';\n"
+            },
         }
         for name, files in cases.items():
             with self.subTest(name):
@@ -716,6 +737,15 @@ class TestIndependentBuildCheck(GateCase):
                 proj = self.project(evidence, ASSIST_TRACK)
                 checks = {f["check"] for f in self.gate.check_item(proj / "evidence", ITEM)}
                 self.assertEqual(checks, {"coverage"})
+
+    def test_one_note_that_names_the_metric_is_enough_to_skip_the_actor_check(self):
+        # The route note alone, then the intake note alone: neither needs the other.
+        for stage in ("route", "intake"):
+            with self.subTest(stage):
+                evidence = dict(CLEAN)
+                evidence[f"{stage}-{ITEM}.md"] = "metric_name: self_service_rate\n"
+                proj = self.project(evidence, ASSIST_TRACK)
+                self.assertEqual(self.gate.check_item(proj / "evidence", ITEM), [])
 
     def test_an_empty_mart_still_blocks_a_self_service_item(self):
         proj = self.project(with_metric("self_service_rate"), {PY: track_python("self_service 0\n")})

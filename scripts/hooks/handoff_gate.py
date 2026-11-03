@@ -90,8 +90,9 @@ NON_RESPONSE_ACTORS = {"customer"}
 # Metrics whose figure is not built from the interaction extract, so an actor the mart does not
 # count cannot reach it. self_service_rate reads tickets and suggestions only (the SQL of its mart,
 # `self_service.sql` under MARTS_DIR in the track). The check of actors is skipped only when the
-# evidence names a metric from this set and nothing else. The note is written by the model, so a
-# missing note, an unknown metric, or two notes that disagree leave the check on.
+# evidence names a metric from this set and nothing else. The note is written by the model: no note
+# that names a metric, an unknown metric, or two notes that disagree leave the check on, and one note
+# that names such a metric is enough to skip it.
 ACTOR_FREE_METRICS = {"self_service_rate"}
 # A heuristic reader of the mart: exactly one `actor IN (...)` in the file, and a WHERE that reaches it
 # with no CASE, NOT or OR in between (a CASE elsewhere is fine). Anything else is not read; it is
@@ -273,6 +274,13 @@ def read_sql(path):
         return re.sub(r"/\*.*?\*/", "", re.sub(r"--[^\n]*", "", handle.read()), flags=re.S)
 
 
+def show_actor(actor):
+    """An actor as the message names it: quoted when a space would not show, `(blank)` when empty."""
+    if not actor:
+        return "(blank)"
+    return repr(actor) if actor != actor.strip() else actor
+
+
 def check_coverage(track):
     """An actor in the interaction extract that the first response mart neither counts nor declares
     as not a response: its tickets drop out of the figure and no shape test notices."""
@@ -281,7 +289,9 @@ def check_coverage(track):
             reader = csv.DictReader(handle)
             if "actor" not in (reader.fieldnames or []):
                 return cannot_evaluate(EXTRACT_CSV, "actor", "no such column", "an actor column")
-            seen = Counter((row.get("actor") or "").strip() for row in reader)
+            # The value is kept as it is: DuckDB keeps a space and the case, and the mart filter is an
+            # exact match, so a trimmed value would count as covered a row that the mart drops.
+            seen = Counter(row.get("actor") or "" for row in reader)
         sql = read_sql(os.path.join(track, FILTER_SQL))
     except (OSError, csv.Error) as error:
         return cannot_evaluate(EXTRACT_CSV, "-", f"could not read the extract or the mart ({error.__class__.__name__})", "both files to be readable")
@@ -297,7 +307,7 @@ def check_coverage(track):
     absent = sorted(counted - set(seen))
     note = f"; {', '.join(absent)} {'is' if len(absent) == 1 else 'are'} not in the extract" if absent else ""
     expected = f"counted by {os.path.basename(FILTER_SQL)} ({', '.join(sorted(counted))}{note}) or declared as not a response"
-    found = ", ".join(f"{actor or '(blank)'} ({seen[actor]} interaction{'' if seen[actor] == 1 else 's'})" for actor in uncovered)
+    found = ", ".join(f"{show_actor(actor)} ({seen[actor]} interaction{'' if seen[actor] == 1 else 's'})" for actor in uncovered)
     return [failure("coverage", EXTRACT_CSV, "actor", found, expected)]
 
 
