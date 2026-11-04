@@ -82,7 +82,7 @@ Owner of the control: to be named by the group.
 | :- | :- | :- |
 | `coverage` | `data/ops-extract/interaction.csv` and `project/models/marts/first_response.sql`, in the track | An actor in the extract, compared as written (case and spaces count, as in the warehouse), is not in the `actor IN (...)` list of the mart and not in `NON_RESPONSE_ACTORS`. A mart filter that names an actor the extract lacks is noted in the message and does not block. Skipped when the intake or route note names a metric in `ACTOR_FREE_METRICS` and no other |
 | `marts` | The SQL under `project/models/marts` (the tables it creates) and `warehouse.duckdb`, through `.venv/bin/python` of the track, read-only, 30 seconds at most | A table the SQL creates is missing from the warehouse, or any table of its `marts` schema has zero rows |
-| `cannot_evaluate` | Everything above, and `track.yaml` | `track.yaml` is missing or has no `context_repository`; the path is not a directory; the extract or the mart is unreadable, has no actor column, no rows, or not exactly one plain `WHERE ... actor IN (...)` filter (a second filter, a `NOT`, an `OR` or a `CASE` in the way, or none); no SQL creates a mart; the warehouse or the interpreter is missing, exits with an error, times out or answers with something that is not `<mart> <rows>` |
+| `cannot_evaluate` | Everything above, and `track.yaml` | `track.yaml` is missing or has no `context_repository`; the path is not the pinned track (`TRACK_REPOSITORY`) or not a directory; the extract or the mart is unreadable, has no actor column, no rows, or not exactly one plain `WHERE ... actor IN (...)` filter (a second filter, a `NOT`, an `OR` or a `CASE` in the way, or none); no SQL creates a mart; the warehouse or the interpreter is missing, exits with an error, times out or answers with something that is not `<mart> <rows>` |
 
 `NON_RESPONSE_ACTORS` holds `customer`. That is an assumption of the group, written in a comment at
 the constant: the owner of the metric has not recorded it. With today's extract the only actor that
@@ -92,8 +92,12 @@ fails is `assist`.
 (`project/models/marts/self_service.sql`, measured with `grep` on its `FROM` and `JOIN` lines and on
 the staging models behind them).
 
-The track is found through `context_repository` in `track.yaml`, which is next to the `evidence/`
-directory the gate already uses. The signature of `check_item` does not change, so the hook, the
+The track is pinned in the script: `TRACK_REPOSITORY` holds `../portwell-analytics`, relative to
+the project root. `context_repository` in `track.yaml`, which is next to the `evidence/` directory
+the gate already uses, has to name the same directory once resolved (`../portwell-analytics/` and
+an absolute path to it both do); any other directory is `cannot_evaluate`, so the two cannot drift
+apart unnoticed. `track.yaml` is a data file the model edits as part of the lifecycle; the script is
+code that goes through review, like `NON_RESPONSE_ACTORS`. The signature of `check_item` does not change, so the hook, the
 audit and the `check` command all get the checks.
 
 ## What else changes
@@ -150,9 +154,10 @@ keeps refusing.
 
 ## Evidence
 
-- **Reproducible.** `env PYTHONDONTWRITEBYTECODE=1 python3 tests/test_handoff_gate.py` passes 66
-  tests: the 45 of Module 2 with their assertions unchanged, and 21 new ones. Only the test helper
-  `project()` changed for the old tests: it now builds a clean track by default. REQUEST-007 asks
+- **Reproducible.** `env PYTHONDONTWRITEBYTECODE=1 python3 tests/test_handoff_gate.py` passes 69
+  tests: the 45 of Module 2 with their assertions unchanged, and 24 new ones. Only the test helper
+  `project()` changed for the old tests: it now builds a clean track by default, beside the project
+  under the pinned name, as the real layout has it. REQUEST-007 asks
   for self-service, so the real item is not held by the actor check. From the repository root with
   `../portwell-analytics` built, the two commands print the same message and both exit 1, because
   the evidence of REQUEST-007 is blocked:
@@ -190,17 +195,33 @@ keeps refusing.
   `self_service_rate`, both let it through (exit 0). Neither run failed with `marts` or
   `cannot_evaluate`, so the real query ran through the real interpreter and every mart it listed has
   rows.
+- **The pinned path, red first.** The helper moved to the real layout (project and
+  `portwell-analytics` side by side) and the three cases of the pin were written before the script
+  changed: the 66 cases passed, the case of a `track.yaml` repointed at a clean copy (relative and
+  absolute) and the case of a missing pinned track failed, and the case of the pinned track written
+  another way (absolute, trailing slash, `../decoy/../portwell-analytics`) passed, as it must. Then
+  all 69 passed. On a throwaway project beside a clone of the real track, with clear evidence, an
+  intake note that names `first_response_minutes_p50` and `track.yaml` repointed at a clean copy of
+  the real extract and marts with `assist` added to the filter, the gate of `9526e46` exits 0 on
+  `check` and the new one exits 1 with `context_repository is another directory than the pinned
+  track`; a `Write` of `delivery/figures-REQUEST-007.csv` through the hook exits 2. Pointed back at
+  the real track, it is blocked on `assist` (296 interactions). That clone was not built, so the
+  marts check answered `warehouse.duckdb does not exist`; the run with a built warehouse was not
+  repeated after the pin. `git status --porcelain` in the track printed nothing.
 - **Not verified.** A live session at the repository root with the new checks. It needs an interactive
   session, as in Module 2.
 
 ## Known limitations
 
-- The path of the track comes from `context_repository` in `track.yaml`, a file the model can edit.
-  Repointing it at a directory with a clean extract, a mart filter that names `assist` and a stand-in
-  interpreter made an item that the real track blocks pass (reproduced on a scratch copy), and the
-  gate runs the interpreter it finds at that path. This is the same class as the Module 2 limitation
-  that the model could edit the settings or the script, and review of the diff is the defense. The
-  path is not pinned.
+- The path of the track is pinned in the script (`TRACK_REPOSITORY`). Repointing `context_repository`
+  in `track.yaml` at a directory with a clean extract, a mart filter that names `assist` and a
+  stand-in interpreter used to make an item that the real track blocks pass; it is now
+  `cannot_evaluate` (see "Evidence"). What is left is the class of the Module 2 limitation: the model
+  can edit the script, and the read-only hook covers `Write` and `Edit` only, so a shell command could
+  still replace `../portwell-analytics` itself, for example with a link to another directory (the
+  gate resolves links, and a link that resolves to the pinned path is accepted). Review of the diff
+  is the defense. A clone of the track under another name or in another place is refused until
+  `TRACK_REPOSITORY` is changed in a reviewed commit.
 - The reader of the mart filter is a heuristic. It expects exactly one `actor IN (...)` under a
   `WHERE`, with no `CASE`, `NOT` or `OR` in between; a mart in another shape is `cannot_evaluate`. A
   mart that keeps that shape and changes meaning elsewhere, such as a join that drops tickets, is not
@@ -248,9 +269,6 @@ keeps refusing.
   would repair it, so the repair has to be made outside the session. It is not set and was not tested.
 - Find a source for the metric of an item that the model does not write, so the scope of the actor
   check does not rest on a note the model fills in.
-- Pin the path of the track, for example by refusing a `context_repository` that is not a sibling of
-  the project or by reading it from a variable that the hook command sets, so the model cannot
-  repoint it.
 - Ask the owner of the metric about `assist` and `customer`.
 - Moving the control from the project settings to an organizational one (managed settings) is not
   part of this change. It needs administrator access, and nobody has confirmed that the group has it.
@@ -266,7 +284,7 @@ To be filled by the group. This section is intentionally empty.
 - [ ] `git status --porcelain` inside the track repository prints nothing.
 - [ ] The group confirms the scope: the actor check applies unless the evidence names an actor-free
   metric, and the marts check applies to every item.
-- [ ] The group accepts that the path of the track comes from a file the model can edit, or asks for
-  it to be pinned.
+- [ ] The group accepts that the path of the track is pinned in the script to `../portwell-analytics`
+  and that every member clones the track there.
 - [ ] The owner of the metric is asked whether `assist` and `customer` are outbound responses.
 - [ ] The merge method for #1 and #4 is agreed, or the retarget steps in "Stacked on #4" are accepted.

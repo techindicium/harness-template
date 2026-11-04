@@ -14,6 +14,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,8 @@ BLOCKED = {
 SECTIONS = ("BLOCKED", "WHY", "FOUND", "DO NOT", "NEXT", "ASK THE USER")
 PRODUCT_NAMES = re.compile(r"claude|anthropic|openai|gpt|codex|cursor|copilot|gemini", re.I)
 
+# The track sits beside the project under this name, as the gate pins it (TRACK_REPOSITORY).
+TRACK_DIR = "portwell-analytics"
 # The files of the track repository the gate reads, as the paths it reads them at.
 CSV = "data/ops-extract/interaction.csv"
 SQL = "project/models/marts/first_response.sql"
@@ -140,7 +143,8 @@ class GateCase(unittest.TestCase):
     def project(self, evidence, track=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        proj = Path(tmp.name).resolve()
+        proj = Path(tmp.name).resolve() / "harness-template"
+        proj.mkdir()
         for sub in ("evidence", "delivery", "notes", "traces"):
             (proj / sub).mkdir()
         for name, text in evidence.items():
@@ -149,11 +153,15 @@ class GateCase(unittest.TestCase):
         return proj
 
     def track(self, proj, files):
-        """A throwaway track repository that `proj` points at. It is clean unless `files` replaces one
-        of its files; a value of None leaves that file out."""
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        root = Path(tmp.name).resolve()
+        """A throwaway track repository beside `proj`, where the gate is pinned to look, and named by
+        its track.yaml as the real one is. It is clean unless `files` replaces one of its files; a
+        value of None leaves that file out."""
+        root = self.write_track(proj.parent / TRACK_DIR, files)
+        (proj / "track.yaml").write_text(f"context_repository: ../{TRACK_DIR}  # local path\n")
+        return root
+
+    def write_track(self, root, files):
+        """The files of a track repository under `root`, clean unless `files` replaces one of them."""
         content = {
             CSV: interactions_csv({"agent": 2, "customer": 3}),
             SQL: FIRST_RESPONSE_SQL,
@@ -170,7 +178,6 @@ class GateCase(unittest.TestCase):
             path.write_text(text)
             if name == PY:
                 path.chmod(0o755)
-        (proj / "track.yaml").write_text(f"context_repository: {root}  # local path\n")
         return root
 
     def run_gate(self, proj, args, stdin="", cwd=None, env_extra=None, keep_project_env=True):
@@ -679,6 +686,35 @@ class TestIndependentBuildCheck(GateCase):
                 checks = {f["check"] for f in self.gate.check_item(proj / "evidence", ITEM)}
                 self.assertEqual(checks, {"cannot_evaluate"})
 
+    def test_a_track_yaml_repointed_at_another_track_fails_closed(self):
+        # A clean copy beside the pinned track, which has the real gap, and track.yaml repointed at the
+        # copy. Before the path was pinned this let the item through.
+        proj = self.project(CLEAN, ASSIST_TRACK)
+        decoy = self.write_track(proj.parent / "decoy", {})
+        for value in ("../decoy", str(decoy)):
+            with self.subTest(value):
+                (proj / "track.yaml").write_text(f"context_repository: {value}\n")
+                (item,) = self.gate.check_item(proj / "evidence", ITEM)
+                self.assertEqual((item["check"], item["file"], item["field"]), ("cannot_evaluate", "track.yaml", "context_repository"))
+                self.assertIn(f"../{TRACK_DIR}", item["expected"])
+                self.assertNotIn(str(proj.parent), item["found"])
+                self.assertBlocked(self.write(proj, str(proj / "delivery" / FIGURES)))
+
+    def test_a_missing_pinned_track_fails_closed_although_track_yaml_names_a_track(self):
+        proj = self.project(CLEAN)
+        self.write_track(proj.parent / "decoy", {})
+        shutil.rmtree(proj.parent / TRACK_DIR)
+        (proj / "track.yaml").write_text("context_repository: ../decoy\n")
+        checks = {f["check"] for f in self.gate.check_item(proj / "evidence", ITEM)}
+        self.assertEqual(checks, {"cannot_evaluate"})
+
+    def test_the_pinned_track_written_another_way_is_clear(self):
+        proj = self.project(CLEAN)
+        for value in (str(proj.parent / TRACK_DIR), f"../{TRACK_DIR}/", f"../decoy/../{TRACK_DIR}"):
+            with self.subTest(value):
+                (proj / "track.yaml").write_text(f"context_repository: {value}\n")
+                self.assertEqual(self.gate.check_item(proj / "evidence", ITEM), [])
+
     def test_a_mart_without_rows_is_not_clear(self):
         listing = "first_response 938\nfirst_response_p50 30\nself_service 0\nsla_attainment 30\n"
         (item,) = self.failures({PY: track_python(listing)})
@@ -694,7 +730,7 @@ class TestIndependentBuildCheck(GateCase):
 
     def test_the_query_runs_isolated_and_read_only(self):
         proj = self.project(CLEAN, {PY: recording_python(MARTS_OK)})
-        track = Path(proj.joinpath("track.yaml").read_text().split(":", 1)[1].split("#")[0].strip())
+        track = proj.parent / TRACK_DIR
         self.assertEqual(self.gate.check_item(proj / "evidence", ITEM), [])
         args = [(track / ".venv" / "bin" / f"arg.{n}").read_text() for n in (1, 2, 3, 4)]
         self.assertEqual(args[:2], ["-I", "-c"])

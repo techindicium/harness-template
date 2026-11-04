@@ -11,13 +11,14 @@ file, a missing field, an unreadable file and a field that appears twice with di
 all count as "not clear".
 
 The evidence is written by the model, so the gate does not take its word for the build alone. It
-also reads the track repository that track.yaml names: an actor in the interaction extract that
-the first response mart neither counts nor declares as not a response, and a mart with no rows,
-keep the item out of Handoff too. The checks read the data and the SQL of the track, not a field of
-the evidence, and a track that cannot be read counts as "not clear". Two inputs still come from files
-the model can edit: the path of the track (`context_repository` in track.yaml) and, for the check of
-actors, the metric in the intake or route note, which skips that check for an item whose metric does
-not read interactions (ACTOR_FREE_METRICS). The check of marts is never skipped.
+also reads the track repository: an actor in the interaction extract that the first response mart
+neither counts nor declares as not a response, and a mart with no rows, keep the item out of Handoff
+too. The checks read the data and the SQL of the track, not a field of the evidence, and a track
+that cannot be read counts as "not clear". The path of the track is pinned in the script
+(TRACK_REPOSITORY); a `context_repository` in track.yaml that names another directory is "not
+clear". One input still comes from a file the model can edit: for the check of actors, the metric in
+the intake or route note, which skips that check for an item whose metric does not read
+interactions (ACTOR_FREE_METRICS). The check of marts is never skipped.
 
 Three layers, so the control does not depend on any one harness or model:
 
@@ -77,8 +78,13 @@ CONTRACT = (
     ("build", "build", (("exit_code", "0"),)),
 )
 
-# What the gate reads in the track repository itself. Paths are relative to the track, which is
-# the `context_repository` of track.yaml. Change them to move the gate to another process.
+# The track repository, relative to the project root. It is pinned here, in reviewed code, because
+# track.yaml is a data file the model edits: a `context_repository` repointed at a clean copy would let
+# through an item that the real track blocks. track.yaml has to name the same directory, so the two
+# cannot drift apart unnoticed.
+TRACK_REPOSITORY = "../portwell-analytics"
+# What the gate reads in the track repository itself. Paths are relative to the track. Change them,
+# and TRACK_REPOSITORY, to move the gate to another process.
 EXTRACT_CSV = "data/ops-extract/interaction.csv"
 FILTER_SQL = "project/models/marts/first_response.sql"
 WAREHOUSE = "warehouse.duckdb"
@@ -263,6 +269,8 @@ def track_root(root):
     if not value or value == CONFLICT:
         return None, cannot_evaluate("track.yaml", "context_repository", value or "missing", "a path to the track repository")
     track = os.path.realpath(os.path.join(root, value))
+    if track != os.path.realpath(os.path.join(root, TRACK_REPOSITORY)):
+        return None, cannot_evaluate("track.yaml", "context_repository", "another directory than the pinned track", f"{TRACK_REPOSITORY} (TRACK_REPOSITORY in the gate)")
     if not os.path.isdir(track):
         return None, cannot_evaluate("track.yaml", "context_repository", "not a directory", "a path to the track repository")
     return track, []
@@ -360,8 +368,8 @@ def names_only_actor_free_metrics(evidence_dir, item_id):
 
 def check_track(root, evidence_dir, item_id):
     """Failures found by reading the track repository directly. They read the data and the SQL of the
-    track, not a field of the evidence. Two inputs still come from files the model can edit: the path
-    of the track (track.yaml) and whether the actor check applies (the metric in the intake note)."""
+    track, not a field of the evidence. The path of the track is pinned (TRACK_REPOSITORY); whether the
+    actor check applies still comes from a file the model can edit (the metric in the intake note)."""
     track, failures = track_root(root)
     if track is None:
         return failures
