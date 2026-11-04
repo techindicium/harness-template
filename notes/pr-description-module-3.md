@@ -275,7 +275,16 @@ keeps refusing.
 
 ## Who did what
 
-To be filled by the group. This section is intentionally empty.
+Provisional: the rest of the group is to add its part.
+
+- **Yuri Alves:** designed the control and wrote the two checks of the track (`coverage` and
+  `marts`), the per-check reasons of `format_block`, the sentence in `skills/handoff/SKILL.md`, the
+  21 cases for them and this text (`01b2165`, `f20d73b`); ran the gate on the real item and the
+  throwaway projects, and fixed what the two reviews of the diff found (`9526e46`).
+- **Gabriel Campos:** reviewed the pull request; pinned the path of the track in the gate
+  (`TRACK_REPOSITORY`), moved the test helper to the real layout and wrote the three cases of the
+  pin red first; reproduced the repointed `track.yaml` against the gate before and after the change,
+  and updated this text to match (`463ca69`).
 
 ## Review checklist
 
