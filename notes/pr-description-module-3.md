@@ -154,8 +154,8 @@ keeps refusing.
 
 ## Evidence
 
-- **Reproducible.** `env PYTHONDONTWRITEBYTECODE=1 python3 tests/test_handoff_gate.py` passes 69
-  tests: the 45 of Module 2 with their assertions unchanged, and 24 new ones. Only the test helper
+- **Reproducible.** `env PYTHONDONTWRITEBYTECODE=1 python3 tests/test_handoff_gate.py` passes 70
+  tests: the 46 of Module 2 with their assertions unchanged, and 24 new ones. Only the test helper
   `project()` changed for the old tests: it now builds a clean track by default, beside the project
   under the pinned name, as the real layout has it. REQUEST-007 asks
   for self-service, so the real item is not held by the actor check. From the repository root with
