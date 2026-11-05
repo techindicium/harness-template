@@ -43,7 +43,7 @@ An artifact is a file named `handoff-<ID>.md` (kept in `evidence/`) or `figures-
 
 | Evidence | Required |
 | :- | :- |
-| `approve-<ID>.md` | `approved_by` a person's name (not empty, `UNKNOWN`, `none`, a placeholder or a role), `approved_at` an ISO date. `status` is not read: the `approve` and `handoff` skills define the approval as these two fields and `status` as a label |
+| `approve-<ID>.md` | `approved_by` a person's name, a first name and a surname at least (not empty, `UNKNOWN`, `none`, a placeholder, a role, a first name alone or the name of a model or product such as `Claude Code`, `ChatGPT` or `AI`), `approved_at` an ISO date. `status` is not read: the `approve` and `handoff` skills define the approval as these two fields and `status` as a label |
 | `verify-<ID>.md` | `verify_status: clear` with the three verdicts `pass`, `aligned` and `match` |
 | `context-<ID>.md` | `period_match: true` |
 | `build-<ID>.md` | `exit_code: 0` |
@@ -183,8 +183,10 @@ documentation.
   `Stop`. It is not set and was not tested here.
 - Every gated decision, `allow` included, is appended to the versioned
   `traces/gate-decisions.jsonl`. Whether the log stays versioned is not decided.
-- The approver check is a list of words. A value that is not a person and is not on the list, such
-  as a job title that uses no listed word, passes.
+- The approver check is a list of words and a count. A value of two words or more that is not a
+  person and uses no listed word, such as a job title or the name of a model not on the list,
+  passes. A person known by one name alone is refused. `claude` is not on the list because it is
+  also a first name, so `Claude Dupont` passes and `Claude` alone does not.
 
 ## Next improvement
 
@@ -202,7 +204,9 @@ Provisional: the rest of the group is to add its part.
 - **Gabriel Campos:** reviewed the pull request; found that a reader piped into a writer
   (`echo <name> | xargs touch`, `echo "touch <name>" | sh`) and the `MultiEdit` tool let an artifact
   be written while the item was not clear, wrote the five cases red first and closed both in the
-  gate and the settings.
+  gate and the settings; found that `approved_by: Claude`, `AI` or `ChatGPT` counted as a person,
+  so a model could sign as itself, and required a first name and a surname and refused the names of
+  models and products, nine cases red first.
 
 ## Review checklist
 

@@ -11,7 +11,7 @@ Deliver the approved build output to the requester as a file that includes its o
 ## Entry conditions
 - `evidence/approve-<REQUEST-NNN>.md` exists with `approved_by` and `approved_at` filled by the named approver. `status` is a label and is not an entry condition.
 - No block or escalation is recorded in any prior evidence file.
-- `approved_by` holds a person's name. Blank, `UNKNOWN`, a role and a placeholder do not count.
+- `approved_by` holds a person's name, with a first name and a surname at least. Blank, `UNKNOWN`, a role, a placeholder, a first name alone and the name of a model or product do not count.
 - The handoff gate check exits 0 for the item: `python3 scripts/hooks/handoff_gate.py check <REQUEST-NNN>`, run from the repository root. It reads the same evidence as the conditions above, plus the period and the build, and it reads the track repository itself: the actors of the interaction extract against the filter of the first response mart (skipped for a metric that does not read interactions), and every mart of the warehouse for rows. It prints what to do when it exits 1; a track it cannot read counts as not clear. Any other non-zero exit means the check did not run: treat the item as not clear.
 
 ## Required context
@@ -26,7 +26,7 @@ Deliver the approved build output to the requester as a file that includes its o
 - Do not omit the provenance header from the delivery file (metric name, version, extract date, approver name, approval date).
 
 ## Procedure
-1. Run the handoff gate check for the item (the command in the entry conditions), from the repository root. If it exits with any code other than 0, stop: do not assemble the delivery, and follow the NEXT and ASK THE USER sections it prints. If it printed none, the check itself failed: tell the user. The same check blocks the writes of the delivery artifacts when the session loaded the project hooks; this step does not depend on that. Then read `evidence/approve-<REQUEST-NNN>.md` and confirm `approved_by` holds a person's name (not blank, `UNKNOWN`, a role or a placeholder). Otherwise stop.
+1. Run the handoff gate check for the item (the command in the entry conditions), from the repository root. If it exits with any code other than 0, stop: do not assemble the delivery, and follow the NEXT and ASK THE USER sections it prints. If it printed none, the check itself failed: tell the user. The same check blocks the writes of the delivery artifacts when the session loaded the project hooks; this step does not depend on that. Then read `evidence/approve-<REQUEST-NNN>.md` and confirm `approved_by` holds a person's name with a first name and a surname (not blank, `UNKNOWN`, a role, a placeholder, a first name alone or the name of a model or product). Otherwise stop.
 2. Assemble the delivery file `delivery/figures-<REQUEST-NNN>.csv` in the harness. This file must include, as a header comment or companion section:
    - `metric_name` and `definition_version` (from `policy_13_citation` in the approve evidence)
    - `extract_taken_at` and `extract_taken_by`
