@@ -10,6 +10,16 @@ evidence files of the same item, in `evidence/`, say the item is clear (see CONT
 file, a missing field, an unreadable file and a field that appears twice with different values
 all count as "not clear".
 
+The evidence is written by the model, so the gate does not take its word for the build alone. It
+also reads the track repository: an actor in the interaction extract that the first response mart
+neither counts nor declares as not a response, and a mart with no rows, keep the item out of Handoff
+too. The checks read the data and the SQL of the track, not a field of the evidence, and a track
+that cannot be read counts as "not clear". The path of the track is pinned in the script
+(TRACK_REPOSITORY); a `context_repository` in track.yaml that names another directory is "not
+clear". One input still comes from a file the model can edit: for the check of actors, the metric in
+the intake or route note, which skips that check for an item whose metric does not read
+interactions (ACTOR_FREE_METRICS). The check of marts is never skipped.
+
 Three layers, so the control does not depend on any one harness or model:
 
   core     pure functions: which item does this path or command touch, and what fails for it
@@ -37,12 +47,14 @@ Every decision on an artifact is appended to `traces/gate-decisions.jsonl` under
 root, or to the file named by HANDOFF_GATE_LOG.
 """
 
+import csv
 import json
 import os
 import re
 import shlex
+import subprocess
 import sys
-from collections import namedtuple
+from collections import Counter, namedtuple
 from datetime import datetime, timezone
 
 # Stage -> (check key, required fields). A value is compared without case; "@person" and
@@ -65,6 +77,47 @@ CONTRACT = (
     ("context", "period", (("period_match", "true"),)),
     ("build", "build", (("exit_code", "0"),)),
 )
+
+# The track repository, relative to the project root. It is pinned here, in reviewed code, because
+# track.yaml is a data file the model edits: a `context_repository` repointed at a clean copy would let
+# through an item that the real track blocks. track.yaml has to name the same directory, so the two
+# cannot drift apart unnoticed.
+TRACK_REPOSITORY = "../portwell-analytics"
+# What the gate reads in the track repository itself. Paths are relative to the track. Change them,
+# and TRACK_REPOSITORY, to move the gate to another process.
+EXTRACT_CSV = "data/ops-extract/interaction.csv"
+FILTER_SQL = "project/models/marts/first_response.sql"
+WAREHOUSE = "warehouse.duckdb"
+TRACK_PYTHON = ".venv/bin/python"
+# Actors whose interactions are not a response to the customer. This is an assumption of the group:
+# the owner of the metric has not recorded it, and the definition says only "first outbound
+# interaction". An actor that is neither here nor in the mart's filter keeps the item out.
+NON_RESPONSE_ACTORS = {"customer"}
+# Metrics whose figure is not built from the interaction extract, so an actor the mart does not
+# count cannot reach it. self_service_rate reads tickets and suggestions only (the SQL of its mart,
+# `self_service.sql` under MARTS_DIR in the track). The check of actors is skipped only when the
+# evidence names a metric from this set and nothing else. The note is written by the model: no note
+# that names a metric, an unknown metric, or two notes that disagree leave the check on, and one note
+# that names such a metric is enough to skip it.
+ACTOR_FREE_METRICS = {"self_service_rate"}
+# A heuristic reader of the mart: exactly one `actor IN (...)` in the file, and a WHERE that reaches it
+# with no CASE, NOT or OR in between (a CASE elsewhere is fine). Anything else is not read; it is
+# `cannot_evaluate`, because a filter the gate cannot tell from an exclusion would let a gap through.
+ACTOR_FILTER = re.compile(r"\bactor\s+IN\s*\(([^)]*)\)", re.I)
+WHERE_ACTOR = re.compile(r"\bWHERE\b(?:(?!\bCASE\b|\bNOT\b|\bOR\b|;).)*?\bactor\s+IN\s*\(", re.I | re.S)
+# The tables the SQL of the track creates are the marts the warehouse has to hold.
+MARTS_DIR = "project/models/marts"
+MART_TABLE = re.compile(r"\bCREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+marts\.(\w+)", re.I)
+# Asked of the warehouse through the track's own interpreter, which is the one that has duckdb:
+# every mart and its row count, one `<mart> <rows>` line each.
+MARTS_QUERY = (
+    "import sys, duckdb\n"
+    "con = duckdb.connect(sys.argv[1], read_only=True)\n"
+    "sql = \"select table_name from information_schema.tables where table_schema = 'marts' order by 1\"\n"
+    "for (name,) in con.execute(sql).fetchall():\n"
+    "    print(name, con.execute(f'select count(*) from marts.\"{name}\"').fetchone()[0])\n"
+)
+TRACK_TIMEOUT = 30  # seconds; the query takes about a tenth of a second when the warehouse is there
 
 # Words that mean the value is not a person: a placeholder, or a role instead of a name.
 NOT_A_PERSON = {"unknown", "none", "null", "tbd", "pending", "todo", "placeholder", "nobody", "unassigned"}
@@ -119,7 +172,9 @@ WHY = {
     "incoherent": "The Verify evidence says clear while one of its verdicts is not. Evidence that contradicts itself cannot support a delivery.",
     "period": "The extract has to cover the reporting period. A partial extract produces figures for a different period than the one delivered.",
     "build": "There is nothing to deliver without a successful build.",
-    "cannot_evaluate": "The gate fails closed: when it cannot read the evidence or the event, it does not guess.",
+    "coverage": "A figure is only as complete as the actors the mart counts. An actor in the extract that the mart neither counts nor declares as not a response drops its tickets from the figure, and no shape test fails.",
+    "marts": "The shape tests pass against empty tables, so a build that produced no rows still reads as green. A figure needs every mart to exist and to have rows behind it.",
+    "cannot_evaluate": "The gate fails closed: when it cannot read the evidence, the track or the event, it does not guess.",
     "audit": "A Handoff artifact exists although the item does not pass the gate, so it was created by a route the gate could not see.",
 }
 NEXT = {
@@ -128,6 +183,8 @@ NEXT = {
     "incoherent": "Run Verify again. Do not edit the status to match the verdicts.",
     "period": "The extract does not cover the reporting period. Decide with the user whether to rebuild with the right extract. Do not deliver meanwhile.",
     "build": "Run Act again. Nothing is delivered without a successful build.",
+    "coverage": "Do not edit the mart (the track repository is read-only) and do not add the actor to NON_RESPONSE_ACTORS yourself. Ask the user to put the question to the owner of the metric. Do not deliver meanwhile.",
+    "marts": "Do not deliver. Run Act again and read the build output.",
     "cannot_evaluate": "Stop and tell the user. Do not try another path.",
     "audit": "Tell the user the artifact exists without passing the gate. Do not delete it unless told to.",
 }
@@ -137,6 +194,8 @@ ASK = {
     "incoherent": "The verify evidence for {id} contradicts itself. Should I re-run verify?",
     "period": "The extract does not cover the period for {id}. Can it be rebuilt with the right extract?",
     "build": "The build for {id} did not succeed. Should I run Act again?",
+    "coverage": "For {id}: {reason}. Is an interaction by that actor an outbound response, and who owns the decision?",
+    "marts": "The warehouse for {id} has no rows behind a figure ({reason}). Should I run Act again?",
     "cannot_evaluate": "The handoff gate could not evaluate {id} ({reason}). How do you want to proceed?",
     "audit": "{artifact} exists but {id} does not pass the gate. Do you want it removed or the evidence completed?",
 }
@@ -207,6 +266,127 @@ def failure(check, file, field, found, expected):
     return {"check": check, "file": file, "field": field, "found": found, "expected": expected}
 
 
+def cannot_evaluate(file, field, found, expected):
+    return [failure("cannot_evaluate", file, field, found, expected)]
+
+
+def track_root(root):
+    """The track repository the project names, as (path, []), or (None, the failure that says why not)."""
+    fields = read_fields(os.path.join(root, "track.yaml"))
+    if fields is None:
+        return None, cannot_evaluate("track.yaml", "-", "missing or unreadable", "the file to exist")
+    value = fields.get("context_repository")
+    if not value or value == CONFLICT:
+        return None, cannot_evaluate("track.yaml", "context_repository", value or "missing", "a path to the track repository")
+    track = os.path.realpath(os.path.join(root, value))
+    if track != os.path.realpath(os.path.join(root, TRACK_REPOSITORY)):
+        return None, cannot_evaluate("track.yaml", "context_repository", "another directory than the pinned track", f"{TRACK_REPOSITORY} (TRACK_REPOSITORY in the gate)")
+    if not os.path.isdir(track):
+        return None, cannot_evaluate("track.yaml", "context_repository", "not a directory", "a path to the track repository")
+    return track, []
+
+
+def read_sql(path):
+    """The SQL of a file without its comments, line and block."""
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        return re.sub(r"/\*.*?\*/", "", re.sub(r"--[^\n]*", "", handle.read()), flags=re.S)
+
+
+def show_actor(actor):
+    """An actor as the message names it: quoted when a space would not show, `(blank)` when empty."""
+    if not actor:
+        return "(blank)"
+    return repr(actor) if actor != actor.strip() else actor
+
+
+def check_coverage(track):
+    """An actor in the interaction extract that the first response mart neither counts nor declares
+    as not a response: its tickets drop out of the figure and no shape test notices."""
+    try:
+        with open(os.path.join(track, EXTRACT_CSV), newline="", encoding="utf-8", errors="replace") as handle:
+            reader = csv.DictReader(handle)
+            if "actor" not in (reader.fieldnames or []):
+                return cannot_evaluate(EXTRACT_CSV, "actor", "no such column", "an actor column")
+            # The value is kept as it is: DuckDB keeps a space and the case, and the mart filter is an
+            # exact match, so a trimmed value would count as covered a row that the mart drops.
+            seen = Counter(row.get("actor") or "" for row in reader)
+        sql = read_sql(os.path.join(track, FILTER_SQL))
+    except (OSError, csv.Error) as error:
+        return cannot_evaluate(EXTRACT_CSV, "-", f"could not read the extract or the mart ({error.__class__.__name__})", "both files to be readable")
+    if not seen:
+        return cannot_evaluate(EXTRACT_CSV, "actor", "no interactions", "at least one row")
+    clauses = ACTOR_FILTER.findall(sql)
+    counted = set(re.findall(r"'([^']*)'", clauses[0])) if len(clauses) == 1 and WHERE_ACTOR.search(sql) else set()
+    if not counted:
+        return cannot_evaluate(FILTER_SQL, "actor", "not exactly one plain `WHERE ... actor IN (...)` filter", "one filter the gate can read")
+    uncovered = sorted(actor for actor in seen if actor not in counted | NON_RESPONSE_ACTORS)
+    if not uncovered:
+        return []
+    absent = sorted(counted - set(seen))
+    note = f"; {', '.join(absent)} {'is' if len(absent) == 1 else 'are'} not in the extract" if absent else ""
+    expected = f"counted by {os.path.basename(FILTER_SQL)} ({', '.join(sorted(counted))}{note}) or declared as not a response"
+    found = ", ".join(f"{show_actor(actor)} ({seen[actor]} interaction{'' if seen[actor] == 1 else 's'})" for actor in uncovered)
+    return [failure("coverage", EXTRACT_CSV, "actor", found, expected)]
+
+
+def check_marts(track):
+    """A mart the track defines that the warehouse lacks or holds with no rows. The shape tests of the
+    track pass against empty tables, so a build that produced nothing reads as green; this asks the
+    warehouse itself, through the track's interpreter."""
+    warehouse = os.path.join(track, WAREHOUSE)
+    if not os.path.isfile(warehouse):
+        return cannot_evaluate(WAREHOUSE, "-", "missing", "a warehouse built by the track")
+    defined = set()
+    try:
+        directory = os.path.join(track, MARTS_DIR)
+        for name in sorted(os.listdir(directory)):
+            if name.endswith(".sql"):
+                defined |= set(MART_TABLE.findall(read_sql(os.path.join(directory, name))))
+    except OSError as error:
+        return cannot_evaluate(MARTS_DIR, "-", f"could not read ({error.__class__.__name__})", "the SQL of the marts to be readable")
+    if not defined:
+        return cannot_evaluate(MARTS_DIR, "-", "no table defined", "SQL that creates the marts")
+    command = [os.path.join(track, TRACK_PYTHON), "-I", "-c", MARTS_QUERY, warehouse]
+    try:
+        done = subprocess.run(command, capture_output=True, encoding="utf-8", errors="replace", timeout=TRACK_TIMEOUT)
+    except (OSError, subprocess.SubprocessError) as error:
+        return cannot_evaluate(TRACK_PYTHON, "-", f"could not run ({error.__class__.__name__})", "the track interpreter to answer")
+    if done.returncode != 0:
+        return cannot_evaluate(TRACK_PYTHON, "exit_code", str(done.returncode), "0")
+    rows = {}
+    for line in done.stdout.splitlines():
+        if not line.strip():
+            continue
+        match = re.fullmatch(r"(\S+) (\d+)", line.strip())
+        if not match:
+            return cannot_evaluate(TRACK_PYTHON, "-", "an answer that is not a mart and a row count", "lines of `<mart> <rows>`")
+        rows[match.group(1)] = int(match.group(2))
+    missing = [failure("marts", WAREHOUSE, mart, "missing", "a table with at least one row") for mart in sorted(defined - set(rows))]
+    empty = [failure("marts", WAREHOUSE, mart, "0 rows", "at least one row") for mart, count in rows.items() if count == 0]
+    return missing + empty
+
+
+def names_only_actor_free_metrics(evidence_dir, item_id):
+    """True when the intake or route note names a metric and every metric named is in ACTOR_FREE_METRICS."""
+    names = set()
+    for stage in ("intake", "route"):
+        fields = read_fields(os.path.join(evidence_dir, f"{stage}-{item_id}.md")) or {}
+        if fields.get("metric_name"):
+            names.add(fields["metric_name"].casefold())
+    return bool(names) and names <= ACTOR_FREE_METRICS
+
+
+def check_track(root, evidence_dir, item_id):
+    """Failures found by reading the track repository directly. They read the data and the SQL of the
+    track, not a field of the evidence. The path of the track is pinned (TRACK_REPOSITORY); whether the
+    actor check applies still comes from a file the model can edit (the metric in the intake note)."""
+    track, failures = track_root(root)
+    if track is None:
+        return failures
+    coverage = [] if names_only_actor_free_metrics(evidence_dir, item_id) else check_coverage(track)
+    return coverage + check_marts(track)
+
+
 def check_item(evidence_dir, item_id):
     """Failures that keep the item out of Handoff; an empty list means it is clear."""
     failures = []
@@ -225,6 +405,7 @@ def check_item(evidence_dir, item_id):
             for item in stage_failures:
                 item["check"] = "incoherent"
         failures += stage_failures
+    failures += check_track(os.path.dirname(os.path.abspath(evidence_dir)), evidence_dir, item_id)
     return failures
 
 
@@ -405,7 +586,10 @@ def audit(root):
 def format_block(subject, item_id, failures, artifact=""):
     """The message an agent reads when blocked: what, why, what was found, what not to do, what next."""
     checks = list(dict.fromkeys(f["check"] for f in failures))
-    reason = next((f"{f['field']} is {f['found']}" for f in failures if f["check"] in ("verify", "cannot_evaluate")), "")
+    # Each question cites the first failure of its own check, never one found by another check.
+    reasons = {}
+    for item in failures:
+        reasons.setdefault(item["check"], item["found"] if item["field"] == "-" else f"{item['field']} is {item['found']}")
     found = []
     for item in failures:
         if item["field"] == "-" and item["found"] == "missing":
@@ -419,7 +603,7 @@ def format_block(subject, item_id, failures, artifact=""):
     lines += ["FOUND:"] + found + [f"DO NOT: {DO_NOT}", "NEXT:"]
     lines += [f"  {NEXT[check]}" for check in checks]
     lines.append("ASK THE USER:")
-    lines += [f"  \"{ASK[check].format(id=item_id, reason=reason, artifact=artifact)}\"" for check in checks]
+    lines += [f"  \"{ASK[check].format(id=item_id, reason=reasons[check], artifact=artifact)}\"" for check in checks]
     return "\n".join(lines)
 
 
