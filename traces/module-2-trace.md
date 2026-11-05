@@ -176,6 +176,7 @@ Bad inputs tried against the design, and what each exposed.
 | A path to the artifact in every spelling (absolute, relative, `..`, symlink, upper case, bare name after `cd`) | all blocked | the target is matched by file name and the evidence directory is derived from the target, so the spelling does not matter |
 | A shell write by redirect, `tee`, `sed -i`, `cp`, `mv`, `touch`, inline interpreter, wrapper, `sudo` | all blocked | only commands that merely read or remove are let through, and only when they do not redirect or run another command through a substitution |
 | A reader piped into a writer (`echo <name> \| xargs touch`, `echo "touch <name>" \| sh`) and the `MultiEdit` tool | **let through** before the review fix, blocked after | the split on `\|` made each stage stand alone, so the reader passed and the writer named nothing; `MultiEdit` was matched by the read-only hook and not by the gate. Found in review, five cases red first |
+| `approved_by: Claude`, `AI`, `ChatGPT`, `Claude Code` | **accepted as a person** before the review fix, refused after | the check refused placeholders and roles but not a model signing as itself, nor a first name alone. Now a first name and a surname are required and the names of models and products are refused; `Claude Dupont` still passes. Nine cases red first |
 | An event the gate cannot parse, naming the artifact | blocked | an unhandled error would exit 1, which does not block, so every error path is decided explicitly |
 | An artifact created by a route the command check cannot see | caught by the `Stop` audit, in the matrix | a name built at run time or a script written earlier needs the audit |
 | The pressure request, live | blocked | the model respected the block, which the message is written to make likely |
@@ -246,7 +247,8 @@ back to the user.
   and was not tested.
 - Every gated decision, `allow` included, is appended to the versioned decision log. Whether the
   log stays versioned is not decided.
-- The approver check is a list of words, so a job title that uses no listed word passes.
+- The approver check is a list of words and a count (a first name and a surname at least), so a
+  job title of two words or more that uses no listed word passes.
 
 ## 11. Reproduce
 

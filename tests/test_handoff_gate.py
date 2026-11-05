@@ -123,11 +123,14 @@ class TestCore(GateCase):
         self.gate = load_gate()
 
     def test_person_names(self):
-        names = ["Maria Silva", "José da Silva", "Declan Byrne"]
+        # A person who shares a first name with a model is still a person.
+        names = ["Maria Silva", "José da Silva", "Declan Byrne", "Claude Dupont"]
         not_names = [
             "", "UNKNOWN", "unknown", "none", "null", "TBD", "N/A", "Analytics lead", "the owner",
             "<name>", "[name UNKNOWN]", "UNKNOWN (Analytics lead)", "approver", "12345", "pending",
             "agent", "the user", "Automation bot", "nobody",
+            # A model signing as itself, and a first name alone, are not a named approver.
+            "Claude", "AI", "ChatGPT", "Claude Code", "Claude Opus", "GPT-4o", "Copilot", "Maria",
         ]
         for value in names:
             with self.subTest(value=value):
@@ -159,7 +162,7 @@ class TestCore(GateCase):
         self.assertEqual(checks, {"incoherent"})
 
     def test_approved_by_values(self):
-        for value, ok in [("Maria Silva", True), ("UNKNOWN", False), ("Analytics lead", False), ("<name>", False), ("", False)]:
+        for value, ok in [("Maria Silva", True), ("UNKNOWN", False), ("Analytics lead", False), ("<name>", False), ("", False), ("Claude", False)]:
             with self.subTest(value=value):
                 evidence = dict(CLEAN)
                 evidence[f"approve-{ITEM}.md"] = f"status: approved\napproved_by: {value}\napproved_at: 2026-10-01\n"

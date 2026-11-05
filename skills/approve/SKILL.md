@@ -26,7 +26,7 @@ Assemble the complete decision package that a named approver needs to sign off o
 - Do not advance to Handoff without a recorded human approval in `evidence/approve-<REQUEST-NNN>.md`.
 - Do not deliver figures to the requester before Handoff; the build output stays within the harness until then.
 - Do not infer the approver's name. A role (`Analytics lead`), the `owner:` of a metric in `metric-definitions.yaml`, `authorised_by` in a Context decision, the `approved_by` of an earlier approval, or any name found in another record is not an approver. No source names the Analytics lead, so that name is UNKNOWN until a person records it.
-- `UNKNOWN`, `none`, a role name and a placeholder are not names. The skill never writes any of them in `approved_by`.
+- `UNKNOWN`, `none`, a role name, a placeholder, a first name alone and the name of a model or product are not names. The skill never writes any of them in `approved_by`, and never its own name.
 
 ## Procedure
 1. Read all five evidence files (intake, context, route, build, verify). Check that each exists and that no status field records a block or escalation. If any piece is missing or shows a block, stop — the package is incomplete.

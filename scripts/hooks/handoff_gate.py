@@ -70,6 +70,12 @@ CONTRACT = (
 NOT_A_PERSON = {"unknown", "none", "null", "tbd", "pending", "todo", "placeholder", "nobody", "unassigned"}
 ROLE_WORDS = {"lead", "owner", "manager", "approver", "team", "agent", "assistant", "automation", "bot", "model", "system", "user"}
 EMPTY_VALUES = {"", "none", "null", "unknown", "tbd", "n/a", "na", "-"}
+# Words that name a model or a product instead of a person, so a model cannot sign as itself.
+# `claude` alone is left out: it is also a first name, and a first name alone is refused anyway.
+MODEL_WORDS = {
+    "ai", "llm", "gpt", "chatgpt", "openai", "anthropic", "copilot", "gemini", "codex", "cursor",
+    "opus", "sonnet", "haiku", "code",
+}
 # What a field holds when the same key appears twice with different values.
 CONFLICT = "more than one value"
 
@@ -145,12 +151,13 @@ DO_NOT = (
 
 
 def is_person(value):
-    """A name a person would sign with: not empty, not a placeholder, not a role."""
+    """A name a person would sign with: a first name and a surname at least, not a placeholder, not a
+    role, not a model or a product."""
     value = (value or "").strip()
     if not value or value.casefold() in EMPTY_VALUES or re.fullmatch(r"[<\[].*[>\]]", value):
         return False
-    words = set(re.findall(r"[^\W\d_]+", value.casefold()))
-    return bool(words) and not words & (NOT_A_PERSON | ROLE_WORDS)
+    words = re.findall(r"[^\W\d_]+", value.casefold())
+    return len(words) >= 2 and not set(words) & (NOT_A_PERSON | ROLE_WORDS | MODEL_WORDS)
 
 
 def is_date(value):
