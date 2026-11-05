@@ -1,0 +1,1 @@
+{"ts": "2026-10-28T18:32:06+00:00", "event": "PreToolUse", "tool": "Write", "target": "evidence/handoff-REQUEST-007.md", "item": "REQUEST-007", "decision": "block", "failed": ["approval", "period", "verify"]}
