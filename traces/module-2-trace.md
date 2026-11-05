@@ -139,17 +139,20 @@ ASK THE USER: "Who is the named approver for REQUEST-007?" and two more question
 
 ## 6. Deterministic evidence
 
-- [x] `python3 tests/test_handoff_gate.py` passes 45 tests: the core, the CLI without the hook
+- [x] `python3 tests/test_handoff_gate.py` passes 46 tests: the core, the CLI without the hook
   adapter, the hook adapter with real payload shapes, the block message, the decision log (including
   that it never holds the path of the machine), and the group's own REQUEST-007 evidence.
 - [x] The matrix pins both sides. Blocked: an absolute path, a relative path, `./` and `..`, a
-  bare name after a change of directory, a symlink with another name, upper case, `Edit`, redirect,
+  bare name after a change of directory, a symlink with another name, upper case, `Edit`, `MultiEdit`,
+  redirect,
   append, `tee`, `sed -i`, `cp`, `mv`, `touch`, `git add`, inline Python, `bash -c`, a proxy
   wrapper, `sudo`, a command split over lines, `dd`, a write hidden in a command substitution,
-  backticks, a process substitution or `git --output`, an artifact in any directory found by the
+  backticks, a process substitution or `git --output`, a reader piped into `xargs` or a shell, an
+  artifact in any directory found by the
   `Stop` audit, and an event that cannot be read but names the artifact. Allowed: a clean item,
   paths that are not artifacts, reads (`cat`, `head`, `grep`, `wc`, `ls`, `diff`, `git diff`,
-  `git status`, `git log`, also with `2>/dev/null`, `2>&1` or `git -C`), removing an artifact, other
+  `git status`, `git log`, also with `2>/dev/null`, `2>&1` or `git -C`, and piped only into readers),
+  removing an artifact, other
   tools, and an unreadable event that names nothing.
 - [x] The matrix was first run before the script existed and failed everywhere, which exposed a
   trap: Python itself exits 2 when it cannot open a script, the same code as a block. The test
@@ -172,6 +175,7 @@ Bad inputs tried against the design, and what each exposed.
 | :- | :- | :- |
 | A path to the artifact in every spelling (absolute, relative, `..`, symlink, upper case, bare name after `cd`) | all blocked | the target is matched by file name and the evidence directory is derived from the target, so the spelling does not matter |
 | A shell write by redirect, `tee`, `sed -i`, `cp`, `mv`, `touch`, inline interpreter, wrapper, `sudo` | all blocked | only commands that merely read or remove are let through, and only when they do not redirect or run another command through a substitution |
+| A reader piped into a writer (`echo <name> \| xargs touch`, `echo "touch <name>" \| sh`) and the `MultiEdit` tool | **let through** before the review fix, blocked after | the split on `\|` made each stage stand alone, so the reader passed and the writer named nothing; `MultiEdit` was matched by the read-only hook and not by the gate. Found in review, five cases red first |
 | An event the gate cannot parse, naming the artifact | blocked | an unhandled error would exit 1, which does not block, so every error path is decided explicitly |
 | An artifact created by a route the command check cannot see | caught by the `Stop` audit, in the matrix | a name built at run time or a script written earlier needs the audit |
 | The pressure request, live | blocked | the model respected the block, which the message is written to make likely |

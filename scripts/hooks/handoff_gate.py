@@ -93,6 +93,9 @@ SINGLE_QUOTED = re.compile(r"'[^']*'")
 # Words that run another command; they are skipped to find the command that matters.
 WRAPPERS = {"sudo", "env", "rtk", "proxy", "time", "timeout", "nice", "nohup", "command", "exec", "xargs", "stdbuf"}
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__"}
+# Tools that write the file named by `file_path`. MultiEdit is matched by the read-only hook of
+# Module 1 too; a harness that has no such tool never sends it.
+FILE_TOOLS = ("Write", "Edit", "MultiEdit")
 
 _ID = r"[A-Za-z][A-Za-z0-9]*-\d+"
 _NAME = rf"handoff-(?P<hid>{_ID})\.md|figures-(?P<fid>{_ID})\.csv"
@@ -239,9 +242,15 @@ def targets_for_path(path, cwd):
     return found
 
 
-def segments(command):
-    """Split a shell command on unquoted `;`, `&`, `|` and newlines."""
-    out, buf, quote, i = [], [], None, 0
+def pipelines(command):
+    """Split a shell command into pipelines, each the list of its stages. A pipeline ends on an
+    unquoted `;`, `&`, `&&`, `||` or newline; its stages are joined by `|` or `|&`."""
+    out, stages, buf, quote, i = [], [], [], None, 0
+
+    def cut():
+        stages.append("".join(buf).strip())
+        buf.clear()
+
     while i < len(command):
         char = command[i]
         if quote:
@@ -259,14 +268,22 @@ def segments(command):
             buf.append(char)
         elif char == "&" and (command[i - 1:i] == ">" or command[i + 1:i + 2] == ">"):
             buf.append(char)  # `2>&1` and `&>` redirect; they do not end the command
+        elif char == "|" and command[i + 1:i + 2] != "|":
+            cut()  # a pipe: the next stage reads what this one prints
+            if command[i + 1:i + 2] == "&":
+                i += 1
         elif char in ";&|\n":
-            out.append("".join(buf))
-            buf = []
+            cut()
+            out.append([stage for stage in stages if stage])
+            stages = []
+            if command[i:i + 2] in ("&&", "||"):
+                i += 1
         else:
             buf.append(char)
         i += 1
-    out.append("".join(buf))
-    return [part.strip() for part in out if part.strip()]
+    cut()
+    out.append([stage for stage in stages if stage])
+    return [stages for stages in out if stages]
 
 
 def git_subcommand(words):
@@ -289,27 +306,40 @@ def may_write(segment):
     return ">" in plain or "--output" in plain or any(mark in live for mark in ("$(", "`", "<("))
 
 
+def command_words(segment):
+    """The words of a segment from the command that matters, past assignments, wrappers and their options."""
+    try:
+        words = shlex.split(segment)
+    except ValueError:
+        words = segment.split()
+    while words and (re.fullmatch(r"[A-Za-z_]\w*=.*", words[0]) or os.path.basename(words[0]) in WRAPPERS or re.fullmatch(r"-\S*|\d+(\.\d+)?[smhd]?", words[0])):
+        words.pop(0)
+    return words
+
+
+def only_reads_or_removes(segment):
+    words = command_words(segment)
+    command_word = os.path.basename(words[0]) if words else ""
+    subcommand = git_subcommand(words) if command_word == "git" else ""
+    harmless = command_word in READ_ONLY or command_word in REMOVERS or subcommand in GIT_READ_ONLY | GIT_REMOVERS
+    return harmless and not may_write(segment)
+
+
 def writing_segments(command, depth=0):
-    """Segments that name an artifact and may write it; reads and removals are let through."""
+    """Segments that name an artifact and may write it; reads and removals are let through. A reader
+    passes only when every later stage of its pipeline reads too: `echo <name> | xargs touch` and
+    `echo "touch <name>" | sh` act on what the reader prints."""
     risky = []
-    for segment in segments(command):
-        if not ARTIFACT.search(segment):
-            continue
-        try:
-            words = shlex.split(segment)
-        except ValueError:
-            words = segment.split()
-        while words and (re.fullmatch(r"[A-Za-z_]\w*=.*", words[0]) or os.path.basename(words[0]) in WRAPPERS or re.fullmatch(r"-\S*|\d+(\.\d+)?[smhd]?", words[0])):
-            words.pop(0)
-        if len(words) == 1 and " " in words[0] and depth < 3:
-            risky += writing_segments(words[0], depth + 1)
-            continue
-        command_word = os.path.basename(words[0]) if words else ""
-        subcommand = git_subcommand(words) if command_word == "git" else ""
-        harmless = command_word in READ_ONLY or command_word in REMOVERS or subcommand in GIT_READ_ONLY | GIT_REMOVERS
-        if harmless and not may_write(segment):
-            continue
-        risky.append(segment)
+    for stages in pipelines(command):
+        for index, segment in enumerate(stages):
+            if not ARTIFACT.search(segment):
+                continue
+            words = command_words(segment)
+            if len(words) == 1 and " " in words[0] and depth < 3:
+                risky += writing_segments(words[0], depth + 1)
+                continue
+            if not only_reads_or_removes(segment) or not all(only_reads_or_removes(later) for later in stages[index + 1:]):
+                risky.append(segment)
     return risky
 
 
@@ -424,7 +454,7 @@ def judge(event, tool, targets, cwd, root):
         failures = check_item(evidence_dir(target, cwd, root), target.item_id)
         record(root, event, tool, target, cwd, "block" if failures else "allow", failures)
         if failures:
-            subject = f"{tool} on {target.raw_path}" if tool in ("Write", "Edit") else f"shell command naming {target.name}"
+            subject = f"{tool} on {target.raw_path}" if tool in FILE_TOOLS else f"shell command naming {target.name}"
             print(format_block(subject, target.item_id, failures), file=sys.stderr)
             blocked = True
     return 2 if blocked else 0
@@ -432,7 +462,7 @@ def judge(event, tool, targets, cwd, root):
 
 def on_pre_tool_use(payload, cwd, root):
     tool, args = payload["tool_name"], payload["tool_input"]
-    if tool in ("Write", "Edit"):
+    if tool in FILE_TOOLS:
         targets = targets_for_path(args["file_path"], cwd)
     elif tool == "Bash":
         targets = targets_in_command(args["command"])

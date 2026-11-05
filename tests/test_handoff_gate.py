@@ -231,6 +231,10 @@ class TestBypassIsBlocked(GateCase):
     def test_edit_tool(self):
         self.assertBlocked(self.write(self.proj, str(self.proj / "evidence" / HANDOFF), tool="Edit"))
 
+    def test_multiedit_tool(self):
+        # The read-only hook of Module 1 already matches MultiEdit; the gate has to cover it too.
+        self.assertBlocked(self.write(self.proj, str(self.proj / "evidence" / HANDOFF), tool="MultiEdit"))
+
     def test_shell_forms(self):
         p = self.proj
         cases = [
@@ -259,6 +263,11 @@ class TestBypassIsBlocked(GateCase):
             ("backticks in a reader", f"echo `cp /tmp/x.md evidence/{HANDOFF}`"),
             ("process substitution in a reader", f"diff <(cp /tmp/x.md evidence/{HANDOFF}) /dev/null"),
             ("git output option", f"git diff --output=evidence/{HANDOFF} HEAD"),
+            # A reader that only prints the name, piped into a command that acts on it.
+            ("name piped into xargs", f"echo evidence/{HANDOFF} | xargs touch"),
+            ("command piped into a shell", f'echo "touch evidence/{HANDOFF}" | sh'),
+            ("name piped through a reader into xargs", f"printf '%s\\n' delivery/{FIGURES} | grep csv | xargs -I{{}} cp /tmp/x {{}}"),
+            ("both streams piped into a shell", f'echo "touch evidence/{HANDOFF}" |& bash'),
         ]
         for label, command in cases:
             with self.subTest(label):
@@ -320,6 +329,9 @@ class TestHonestUseIsNotBlocked(GateCase):
             f"git --no-pager log --oneline -- evidence/{HANDOFF}",
             f"grep '>' evidence/{HANDOFF}",
             f"git log --format='%an <%ae>' -- evidence/{HANDOFF}",
+            f"cat evidence/{HANDOFF} | grep x | wc -l",
+            f"cat evidence/{HANDOFF} | xargs grep x",
+            f"cat evidence/{HANDOFF} || touch /tmp/other.md",
         ):
             with self.subTest(command):
                 self.assertPasses(self.bash(proj, command))
