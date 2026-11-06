@@ -141,3 +141,4 @@ new held-out case is needed. The person who holds the held-out file does not wri
 - [ ] A named person holds the held-out file and has posted its `sha256` as a comment.
 - [ ] `python3 tests/test_handoff_gate.py` passes on a clean checkout.
 - [ ] `git status --porcelain` inside the track repository prints nothing.
+- [ ] The final description has a "Who did what" section that lists each participant with their commits.
