@@ -18,6 +18,16 @@ adversarial outcomes, failure attribution, stop conditions, an accepted output, 
 outcome. This change measures the handoff gate and the skills that call it with rules that are
 true or false, and changes one thing because a measurement said so.
 
+## Non-goals
+
+- No eval pipeline, no CI job and no model-graded judge.
+- No new control from Module 2 or 3. A missing one, such as a rule that protects `tests/eval/` in
+  `.claude/settings.json`, is recorded as an observation and not built.
+- No change to the track repository, which stays read-only.
+- No productivity or adoption claim from any number here. Each number carries its `n` and its limit.
+- Not decided here, and still open in #6: `onFailure: "block"`, the merge method for the stack and the
+  owner of the control.
+
 ## Status, measured on 2026-11-06
 
 - The branch starts at the tip of #6. The only change on it so far is this text.
@@ -71,6 +81,16 @@ baseline, or the eval does not discriminate.
   written and kept by Gabriel or Eric. This addition to the list is not agreed yet (point 5).
 - This description, replaced by the full one.
 
+## Dependencies
+
+| On | For | State |
+| :- | :- | :- |
+| The owner of the metric named in `project/metrics/metric-definitions.yaml` | Whether `assist` and `customer` are outbound responses; until then every first response item stays blocked (point 8) | Open, no question recorded |
+| The instructor or the TA | Shared held-out scenarios and what follows this pull request (point 1) | Open, no answer recorded |
+| `portwell-analytics` | Read-only evidence. The gate reads it at the pinned path `../portwell-analytics`, and `git status --porcelain` there must print nothing | In place since #6 |
+| #1, #4 and #6 | This branch is stacked on them, and a squash merge of any of them changes this diff | Open, the merge method is not agreed |
+| Pull request #5, another group | Reference only (point 9) | Proposal in point 9 |
+
 ## How to help, beyond comments
 
 Say in a comment which of these you take, so two people do not take the same one.
@@ -104,6 +124,7 @@ comment (see "Held-out protocol").
 | 10 | Two contradictions not in `track.yaml` (C1 to C16): the Verify order above, and `skills/context/SKILL.md` requiring `status: open` where the intake evidence list has no `status` field | Record them in the report only; adding them to `track.yaml` changes the list of files | Decide where | Report |
 | 11 | The improvement | Choose after the baseline between a metric source the model does not write (the gate) and the Verify order (the skill) | Decide with the baseline | Improvement |
 | 12 | Split of the work | (a) cases and layer A, in TDD; (b) live runs and cost, in EDD; (c) report, improvement and description | Pick a slice | Cases |
+| 13 | Operating measures, which the Module 4 contract says are decided in class | Report only the measures that have a rule and a source: iterations to green, turns and cost, escalation rate, convergence rate, architectural violation rate, cost per accepted change. Correction ratio and escaped defect rate stay UNKNOWN. The DORA measures do not apply, because nothing is deployed | Confirm or change | Report |
 
 ## Held-out protocol
 
@@ -136,9 +157,10 @@ new held-out case is needed. The person who holds the held-out file does not wri
 
 ## Review checklist
 
-- [ ] The group answers the twelve points above.
+- [ ] The group answers the thirteen points above.
 - [ ] The group agrees the list of files, including `tests/eval/heldout.json`.
 - [ ] A named person holds the held-out file and has posted its `sha256` as a comment.
 - [ ] `python3 tests/test_handoff_gate.py` passes on a clean checkout.
 - [ ] `git status --porcelain` inside the track repository prints nothing.
 - [ ] The final description has a "Who did what" section that lists each participant with their commits.
+- [ ] The final description has a "Decision record" and a "Next improvement" section.
