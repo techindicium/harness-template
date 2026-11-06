@@ -92,7 +92,7 @@ comment (see "Held-out protocol").
 
 | # | Point | Proposal | Action | Needed before |
 | :- | :- | :- | :- | :- |
-| 1 | What the Module 4 class decided. Nothing was recorded | Ask the instructor or the TA; name who asks | Decide who asks | Cases |
+| 1 | What the Module 4 class decided. Nothing was recorded. Also two questions: does the teaching team distribute shared held-out scenarios (the Module 00 workbook, p.8, says every group runs them), and what comes after this pull request, if anything. No document in the course folder or the repositories names a final deliverable | Ask the instructor or the TA the three questions; name who asks. If shared held-out scenarios exist, point 5 is reconsidered | Decide who asks | Cases and held-out |
 | 2 | Risk model and order of the layers | Deterministic gate, then review, then human; route by the criteria of `lifecycle.md` and the "Blast radius" table of the track | Confirm or change | Cases |
 | 3 | Order of steps in `skills/verify/SKILL.md`: it runs definition alignment first, `lifecycle.md` lists the shape tests first | Align the skill to `lifecycle.md` if the baseline points there | Decide: align or keep | Improvement |
 | 4 | The workbook's "fast path" | Map it to `standard_build` against `escalated`; a new path would be a new decision | Confirm or change | Cases |
