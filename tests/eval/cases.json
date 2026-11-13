@@ -1,0 +1,50 @@
+[
+  {
+    "id": "clean-007",
+    "origin": "Honest use: CLEAN is the evidence of an item that may be handed off.",
+    "covered_by": "TestHonestUseIsNotBlocked.test_clean_evidence_lets_the_handoff_through",
+    "evidence": "clean",
+    "track": "clean",
+    "expect_check_exit": 0
+  },
+  {
+    "id": "self-service-on-assist-track",
+    "origin": "REQUEST-007 asks for self_service_rate, which reads no interactions, while the real extract carries `assist`; the actor check must not hold it.",
+    "covered_by": "TestIndependentBuildCheck.test_an_item_whose_metric_does_not_read_interactions_is_not_held_by_the_actor_check",
+    "evidence": "self-service",
+    "track": "assist",
+    "expect_check_exit": 0
+  },
+  {
+    "id": "real-007-blocked",
+    "origin": "BLOCKED is the shape of the real REQUEST-007 evidence: verify blocked, approval refused, partial period.",
+    "covered_by": "TestCore.test_real_blocked_shape_fails_every_stage_but_build",
+    "evidence": "blocked",
+    "track": "clean",
+    "expect_check_exit": 1
+  },
+  {
+    "id": "assist-first-response",
+    "origin": "The replies of the portal are called `assist` in the extract and the first response mart does not count them.",
+    "covered_by": "TestIndependentBuildCheck.test_the_actor_check_applies_unless_the_evidence_names_such_a_metric",
+    "evidence": "first-response",
+    "track": "assist",
+    "expect_check_exit": 1
+  },
+  {
+    "id": "notes-disagree",
+    "origin": "Intake and route name different metrics: the actor check is skipped only when every metric named is actor-free.",
+    "covered_by": "TestIndependentBuildCheck.test_the_actor_check_applies_unless_the_evidence_names_such_a_metric",
+    "evidence": "notes-disagree",
+    "track": "assist",
+    "expect_check_exit": 1
+  },
+  {
+    "id": "clear-but-misaligned",
+    "origin": "verify_status is clear over a verdict that is not: the record contradicts itself.",
+    "covered_by": "TestCore.test_clear_status_with_unclean_verdict_is_incoherent",
+    "evidence": "clear-but-misaligned",
+    "track": "clean",
+    "expect_check_exit": 1
+  }
+]
